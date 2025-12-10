@@ -251,10 +251,10 @@ async function processMLMCommissions(buyerId: string, referrerId: string, amount
     }
   }
 
-  // Process commissions for each level
+  // Process commissions for each level - key purchase bonuses disabled for simplified system
   for (const chainItem of referralChain) {
     const rate = commissionRates.find(r => r.level === chainItem.level);
-    if (rate && rate.keyPurchaseBonus > 0) {
+    if (rate && false) { // Disabled for simplified commission system
       const commissionAmount = (amount * rate.keyPurchaseBonus) / 100;
 
       // Get current balance before updating

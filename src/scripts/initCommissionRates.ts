@@ -13,48 +13,48 @@ async function initCommissionRates() {
       return;
     }
 
-    // Production-ready MLM commission structure
+    // Production-ready MLM commission structure - simplified flat commission system
     const defaultRates = [
       {
         level: 1,
         referralBonus: 500, // ₹500 fixed bonus for direct referral
-        levelBonus: 5, // 5% from level 1 network activities
-        keyPurchaseBonus: 5, // 5% when level 1 referrals buy keys
+        levelBonus: 0, // No longer used - simplified to flat amounts
+        keyPurchaseBonus: 0, // No longer used - simplified to flat amounts
         isActive: true
       },
       {
         level: 2,
-        referralBonus: 0, // No direct referral bonus for level 2+
-        levelBonus: 4, // 4% from level 2 network activities (₹20 from ₹500 referral)
-        keyPurchaseBonus: 4, // 4% when level 2 referrals buy keys
+        referralBonus: 300, // ₹300 fixed bonus for level 2 referrals
+        levelBonus: 0,
+        keyPurchaseBonus: 0,
         isActive: true
       },
       {
         level: 3,
-        referralBonus: 0,
-        levelBonus: 3, // 3% from level 3 network activities (₹15 from ₹500 referral)
-        keyPurchaseBonus: 3, // 3% when level 3 referrals buy keys
+        referralBonus: 200, // ₹200 fixed bonus for level 3 referrals
+        levelBonus: 0,
+        keyPurchaseBonus: 0,
         isActive: true
       },
       {
         level: 4,
-        referralBonus: 0,
-        levelBonus: 2, // 2% from level 4 network activities (₹10 from ₹500 referral)
-        keyPurchaseBonus: 2, // 2% when level 4 referrals buy keys
+        referralBonus: 100, // ₹100 fixed bonus for level 4 referrals
+        levelBonus: 0,
+        keyPurchaseBonus: 0,
         isActive: true
       },
       {
         level: 5,
-        referralBonus: 0,
-        levelBonus: 1, // 1% from level 5 network activities (₹5 from ₹500 referral)
-        keyPurchaseBonus: 1, // 1% when level 5 referrals buy keys
+        referralBonus: 50, // ₹50 fixed bonus for level 5 referrals
+        levelBonus: 0,
+        keyPurchaseBonus: 0,
         isActive: true
       },
       {
         level: 6,
-        referralBonus: 0,
-        levelBonus: 0.5, // 0.5% from deepest level (₹2.50 from ₹500 referral)
-        keyPurchaseBonus: 0.5, // 0.5% when level 6 referrals buy keys
+        referralBonus: 50, // ₹50 fixed bonus for level 6 referrals
+        levelBonus: 0,
+        keyPurchaseBonus: 0,
         isActive: true
       }
     ];

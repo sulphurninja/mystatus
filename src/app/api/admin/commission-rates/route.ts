@@ -118,14 +118,14 @@ export async function PUT(request: NextRequest) {
       );
     }
 
-    // Default production-ready rates
+    // Default production-ready rates - simplified flat commission system
     const defaultRates = [
-      { level: 1, referralBonus: 500, levelBonus: 5, keyPurchaseBonus: 5, isActive: true },
-      { level: 2, referralBonus: 0, levelBonus: 4, keyPurchaseBonus: 4, isActive: true },
-      { level: 3, referralBonus: 0, levelBonus: 3, keyPurchaseBonus: 3, isActive: true },
-      { level: 4, referralBonus: 0, levelBonus: 2, keyPurchaseBonus: 2, isActive: true },
-      { level: 5, referralBonus: 0, levelBonus: 1, keyPurchaseBonus: 1, isActive: true },
-      { level: 6, referralBonus: 0, levelBonus: 0.5, keyPurchaseBonus: 0.5, isActive: true },
+      { level: 1, referralBonus: 500, levelBonus: 0, keyPurchaseBonus: 0, isActive: true },
+      { level: 2, referralBonus: 300, levelBonus: 0, keyPurchaseBonus: 0, isActive: true },
+      { level: 3, referralBonus: 200, levelBonus: 0, keyPurchaseBonus: 0, isActive: true },
+      { level: 4, referralBonus: 100, levelBonus: 0, keyPurchaseBonus: 0, isActive: true },
+      { level: 5, referralBonus: 50, levelBonus: 0, keyPurchaseBonus: 0, isActive: true },
+      { level: 6, referralBonus: 50, levelBonus: 0, keyPurchaseBonus: 0, isActive: true },
     ];
 
     const newRates = await CommissionRate.insertMany(defaultRates);

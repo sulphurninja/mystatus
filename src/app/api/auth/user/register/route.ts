@@ -185,11 +185,9 @@ async function processRegistrationCommissions(newUserId: string, directReferrerI
   // Process commissions for each level
   for (const chainItem of referralChain) {
     const rate = commissionRates.find(r => r.level === chainItem.level);
-    if (rate && ((chainItem.level === 1 && rate.referralBonus > 0) || (chainItem.level > 1 && rate.levelBonus > 0))) {
-      // Level 1 gets fixed referral bonus, other levels get percentage of referral bonus
-      const commissionAmount = chainItem.level === 1
-        ? rate.referralBonus
-        : (rate.referralBonus * rate.levelBonus) / 100;
+    if (rate && rate.referralBonus > 0) {
+      // Each level gets its fixed referral bonus amount
+      const commissionAmount = rate.referralBonus;
 
       if (commissionAmount > 0) {
         // Get current balance before updating

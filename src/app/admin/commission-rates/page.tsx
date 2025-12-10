@@ -179,14 +179,14 @@ export default function CommissionRatesPage() {
   };
 
   const resetToDefault = () => {
-    // Production-ready defaults based on business requirements
+    // Production-ready defaults - simplified flat commission system
     const defaultRates: CommissionRate[] = [
-      { level: 1, referralBonus: 500, levelBonus: 5, keyPurchaseBonus: 5, isActive: true },
-      { level: 2, referralBonus: 0, levelBonus: 4, keyPurchaseBonus: 4, isActive: true },
-      { level: 3, referralBonus: 0, levelBonus: 3, keyPurchaseBonus: 3, isActive: true },
-      { level: 4, referralBonus: 0, levelBonus: 2, keyPurchaseBonus: 2, isActive: true },
-      { level: 5, referralBonus: 0, levelBonus: 1, keyPurchaseBonus: 1, isActive: true },
-      { level: 6, referralBonus: 0, levelBonus: 0.5, keyPurchaseBonus: 0.5, isActive: true },
+      { level: 1, referralBonus: 500, levelBonus: 0, keyPurchaseBonus: 0, isActive: true },
+      { level: 2, referralBonus: 300, levelBonus: 0, keyPurchaseBonus: 0, isActive: true },
+      { level: 3, referralBonus: 200, levelBonus: 0, keyPurchaseBonus: 0, isActive: true },
+      { level: 4, referralBonus: 100, levelBonus: 0, keyPurchaseBonus: 0, isActive: true },
+      { level: 5, referralBonus: 50, levelBonus: 0, keyPurchaseBonus: 0, isActive: true },
+      { level: 6, referralBonus: 50, levelBonus: 0, keyPurchaseBonus: 0, isActive: true },
     ];
     setRates(defaultRates);
   };
@@ -242,7 +242,7 @@ export default function CommissionRatesPage() {
         <button
           onClick={resetToDefault}
           className="px-5 py-3 rounded-2xl border border-slate-700/50 bg-slate-800/50 text-slate-200 hover:bg-slate-700/50 transition-all duration-200 flex items-center gap-2"
-          title="Reset to production-ready defaults: ₹500 direct bonus, 5%-0.5% cascading rates"
+          title="Reset to production-ready defaults: ₹500, ₹300, ₹200, ₹100, ₹50, ₹50 flat commissions"
         >
           <RefreshCw className="h-4 w-4" />
           Reset to Production Defaults
@@ -262,7 +262,7 @@ export default function CommissionRatesPage() {
         <div className="px-6 py-5 border-b border-slate-700/50">
           <h2 className="text-xl font-semibold text-slate-100">MLM Commission Structure</h2>
           <p className="text-slate-400 text-sm mt-1">
-            Configure referral bonuses and percentage rates for your 6-level MLM network.
+            Configure flat commission amounts for your 6-level MLM network.
           </p>
         </div>
         <div className="overflow-x-auto">
@@ -270,9 +270,7 @@ export default function CommissionRatesPage() {
             <thead className="bg-slate-800/70 text-slate-300">
               <tr>
                 <th className="px-4 py-3 font-semibold">Level</th>
-                <th className="px-4 py-3 font-semibold">Direct Referral Bonus (₹)</th>
-                <th className="px-4 py-3 font-semibold">Level Bonus (%)</th>
-                <th className="px-4 py-3 font-semibold">Key Purchase Bonus (%)</th>
+                <th className="px-4 py-3 font-semibold">Commission Amount (₹)</th>
                 <th className="px-4 py-3 font-semibold">Status</th>
               </tr>
             </thead>
@@ -286,33 +284,9 @@ export default function CommissionRatesPage() {
                       value={rate.referralBonus}
                       onChange={(e) => updateRate(rate.level, 'referralBonus', parseFloat(e.target.value) || 0)}
                       className="bg-slate-800/60 border-slate-700/50 text-slate-100"
-                      placeholder={rate.level === 1 ? "500" : "0"}
+                      placeholder={rate.level === 1 ? "500" : rate.level === 2 ? "300" : rate.level === 3 ? "200" : rate.level === 4 ? "100" : rate.level === 5 ? "50" : "50"}
                       min="0"
                       max="5000"
-                    />
-                  </td>
-                  <td className="px-4 py-3">
-                    <Input
-                      type="number"
-                      value={rate.levelBonus}
-                      onChange={(e) => updateRate(rate.level, 'levelBonus', parseFloat(e.target.value) || 0)}
-                      className="bg-slate-800/60 border-slate-700/50 text-slate-100"
-                      placeholder={rate.level === 1 ? "5" : rate.level === 2 ? "4" : rate.level === 3 ? "3" : rate.level === 4 ? "2" : rate.level === 5 ? "1" : "0.5"}
-                      min="0"
-                      max="100"
-                      step="0.1"
-                    />
-                  </td>
-                  <td className="px-4 py-3">
-                    <Input
-                      type="number"
-                      value={rate.keyPurchaseBonus}
-                      onChange={(e) => updateRate(rate.level, 'keyPurchaseBonus', parseFloat(e.target.value) || 0)}
-                      className="bg-slate-800/60 border-slate-700/50 text-slate-100"
-                      placeholder={rate.level === 1 ? "5" : rate.level === 2 ? "4" : rate.level === 3 ? "3" : rate.level === 4 ? "2" : rate.level === 5 ? "1" : "0.5"}
-                      min="0"
-                      max="100"
-                      step="0.1"
                     />
                   </td>
                   <td className="px-4 py-3">
@@ -333,39 +307,39 @@ export default function CommissionRatesPage() {
 
         {/* Commission Examples */}
         <div className="bg-gradient-to-r from-emerald-500/10 to-teal-500/10 border border-emerald-500/20 rounded-xl p-4">
-          <h4 className="font-semibold text-emerald-400 mb-2">Example: When someone joins with your referral</h4>
+          <h4 className="font-semibold text-emerald-400 mb-2">Example: When someone joins in your network</h4>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
             <div className="bg-slate-800/60 rounded-lg p-3">
-              <div className="text-emerald-400 font-bold">Level 1 (You)</div>
-              <div className="text-slate-300">₹500 fixed bonus</div>
+              <div className="text-emerald-400 font-bold">Level 1 (Direct)</div>
+              <div className="text-slate-300">₹500 fixed commission</div>
             </div>
             <div className="bg-slate-800/60 rounded-lg p-3">
-              <div className="text-emerald-400 font-bold">Level 2 (Your referrer)</div>
-              <div className="text-slate-300">4% of ₹500 = ₹20</div>
+              <div className="text-emerald-400 font-bold">Level 2</div>
+              <div className="text-slate-300">₹300 fixed commission</div>
             </div>
             <div className="bg-slate-800/60 rounded-lg p-3">
-              <div className="text-emerald-400 font-bold">Level 3+</div>
-              <div className="text-slate-300">3% to 0.5% of ₹500</div>
+              <div className="text-emerald-400 font-bold">Level 3-6</div>
+              <div className="text-slate-300">₹200 to ₹50 fixed</div>
             </div>
           </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="bg-slate-800/40 border border-slate-700/50 rounded-xl p-4">
-            <h4 className="font-semibold text-slate-100">Direct Referral Bonus</h4>
-            <p className="text-sm text-slate-400 mt-1">Fixed ₹500 earned when someone joins with your referral code.</p>
+            <h4 className="font-semibold text-slate-100">Fixed Commission Amounts</h4>
+            <p className="text-sm text-slate-400 mt-1">Each level earns a fixed amount when someone joins anywhere in their network.</p>
           </div>
           <div className="bg-slate-800/40 border border-slate-700/50 rounded-xl p-4">
-            <h4 className="font-semibold text-slate-100">Level Bonus</h4>
-            <p className="text-sm text-slate-400 mt-1">Percentage of the referral bonus earned from deeper network levels.</p>
-          </div>
-          <div className="bg-slate-800/40 border border-slate-700/50 rounded-xl p-4">
-            <h4 className="font-semibold text-slate-100">Key Purchase Bonus</h4>
-            <p className="text-sm text-slate-400 mt-1">Percentage commission when anyone in your network buys activation keys.</p>
+            <h4 className="font-semibold text-slate-100">Simplified Structure</h4>
+            <p className="text-sm text-slate-400 mt-1">No more confusing percentages - just flat amounts you can easily understand.</p>
           </div>
           <div className="bg-slate-800/40 border border-slate-700/50 rounded-xl p-4">
             <h4 className="font-semibold text-slate-100">Network Depth</h4>
             <p className="text-sm text-slate-400 mt-1">Earn commissions up to 6 levels deep in your referral network.</p>
+          </div>
+          <div className="bg-slate-800/40 border border-slate-700/50 rounded-xl p-4">
+            <h4 className="font-semibold text-slate-100">Easy to Predict</h4>
+            <p className="text-sm text-slate-400 mt-1">Know exactly how much you'll earn at each level in your network.</p>
           </div>
         </div>
 
@@ -375,8 +349,8 @@ export default function CommissionRatesPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
             <div className="space-y-2">
               <div className="flex justify-between">
-                <span className="text-slate-400">Direct Bonus:</span>
-                <span className="text-emerald-400 font-bold">₹{rates.find(r => r.level === 1)?.referralBonus || 0}</span>
+                <span className="text-slate-400">Total Commission:</span>
+                <span className="text-emerald-400 font-bold">₹{rates.filter(r => r.isActive).reduce((sum, r) => sum + r.referralBonus, 0)}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-slate-400">Max Network:</span>
@@ -385,28 +359,25 @@ export default function CommissionRatesPage() {
             </div>
             <div className="space-y-2">
               <div className="flex justify-between">
-                <span className="text-slate-400">Level Range:</span>
-                <span className="text-emerald-400 font-bold">{Math.min(...rates.filter(r => r.isActive && r.level > 1).map(r => r.levelBonus))}% - {Math.max(...rates.filter(r => r.isActive && r.level > 1).map(r => r.levelBonus))}%</span>
+                <span className="text-slate-400">Commission Range:</span>
+                <span className="text-emerald-400 font-bold">₹{Math.min(...rates.filter(r => r.isActive).map(r => r.referralBonus))} - ₹{Math.max(...rates.filter(r => r.isActive).map(r => r.referralBonus))}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-slate-400">Key Bonus:</span>
-                <span className="text-emerald-400 font-bold">Up to {Math.max(...rates.map(r => r.keyPurchaseBonus))}%</span>
+                <span className="text-slate-400">Average Level:</span>
+                <span className="text-emerald-400 font-bold">₹{Math.round(rates.filter(r => r.isActive).reduce((sum, r) => sum + r.referralBonus, 0) / rates.filter(r => r.isActive).length)}</span>
               </div>
             </div>
           </div>
 
           {/* Sample Earnings Calculator */}
           <div className="mt-4 pt-4 border-t border-slate-700/50">
-            <h5 className="font-semibold text-slate-100 mb-2">Sample Earnings (per ₹500 referral)</h5>
+            <h5 className="font-semibold text-slate-100 mb-2">Commission Amounts per Level</h5>
             <div className="grid grid-cols-3 md:grid-cols-6 gap-2 text-xs">
               {rates.filter(r => r.isActive).map((rate) => (
                 <div key={rate.level} className="bg-slate-700/50 rounded-lg p-2 text-center">
                   <div className="text-slate-400">Level {rate.level}</div>
                   <div className="text-emerald-400 font-bold">
-                    {rate.level === 1
-                      ? `₹${rate.referralBonus}`
-                      : `₹${((rate.referralBonus * rate.levelBonus) / 100).toFixed(0)}`
-                    }
+                    ₹{rate.referralBonus}
                   </div>
                 </div>
               ))}
