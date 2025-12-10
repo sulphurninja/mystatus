@@ -2,42 +2,40 @@
 
 import { useState, useEffect } from 'react';
 
-interface Advertisement {
+interface MyStatusAd {
   _id: string;
   title: string;
   description: string;
   image: string;
-  rewardAmount: number;
-  vendor: {
-    _id: string;
-    name: string;
-    businessName: string;
-  };
+  category: string;
   isActive: boolean;
   totalShares: number;
-  totalVerifiedShares: number;
-  totalRewardsPaid: number;
-  verificationPeriodHours: number;
   createdAt: string;
 }
 
-export default function AdvertisementsPage() {
-  const [advertisements, setAdvertisements] = useState<Advertisement[]>([]);
+export default function MyStatusAdsPage() {
+  const [mystatusAds, setMystatusAds] = useState<MyStatusAd[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-  const [vendors, setVendors] = useState<{ _id: string; businessName: string }[]>([]);
   const [newAd, setNewAd] = useState({
     title: '',
     description: '',
     image: '',
-    rewardAmount: '',
-    vendorId: '',
-    verificationPeriodHours: '8',
+    category: 'motivation',
   });
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
-  const [editingAd, setEditingAd] = useState<Advertisement | null>(null);
+  const [editingAd, setEditingAd] = useState<MyStatusAd | null>(null);
+
+  const categories = [
+    { value: 'motivation', label: 'Motivation' },
+    { value: 'inspiration', label: 'Inspiration' },
+    { value: 'success', label: 'Success' },
+    { value: 'mindset', label: 'Mindset' },
+    { value: 'goals', label: 'Goals' },
+    { value: 'positivity', label: 'Positivity' },
+  ];
 
   const getAuthHeaders = () => {
     const token = typeof window !== 'undefined' ? localStorage.getItem('adminToken') : null;
@@ -45,14 +43,13 @@ export default function AdvertisementsPage() {
   };
 
   useEffect(() => {
-    loadAdvertisements();
-    loadVendors();
+    loadMyStatusAds();
   }, []);
 
-  const loadAdvertisements = async () => {
+  const loadMyStatusAds = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/admin/advertisements', {
+      const response = await fetch('/api/admin/mystatus-ads', {
         headers: {
           'Content-Type': 'application/json',
           ...getAuthHeaders(),
@@ -60,40 +57,20 @@ export default function AdvertisementsPage() {
       });
       if (response.ok) {
         const data = await response.json();
-        setAdvertisements(data.advertisements || []);
+        setMystatusAds(data.mystatusAds || []);
       } else {
-        setAdvertisements([]);
+        setMystatusAds([]);
       }
     } catch (error) {
-      console.error('Error loading advertisements:', error);
-      setAdvertisements([]);
+      console.error('Error loading MyStatus ads:', error);
+      setMystatusAds([]);
     } finally {
       setLoading(false);
     }
   };
 
-  const loadVendors = async () => {
-    try {
-      const response = await fetch('/api/admin/vendors', {
-        headers: {
-          'Content-Type': 'application/json',
-          ...getAuthHeaders(),
-        },
-      });
-      if (response.ok) {
-        const data = await response.json();
-        setVendors(data.vendors || []);
-      } else {
-        setVendors([]);
-      }
-    } catch (error) {
-      console.error('Error loading vendors:', error);
-      setVendors([]);
-    }
-  };
-
   const handleCreateAd = async () => {
-    if (!newAd.title || !newAd.description || !newAd.rewardAmount || !newAd.vendorId) return;
+    if (!newAd.title || !newAd.description || !newAd.category) return;
     if (!selectedFile && !newAd.image) {
       alert('Please select an image file or provide an image URL');
       return;
@@ -109,7 +86,7 @@ export default function AdvertisementsPage() {
 
     try {
       const method = editingAd ? 'PUT' : 'POST';
-      const url = editingAd ? `/api/admin/advertisements/${editingAd._id}` : '/api/admin/advertisements';
+      const url = editingAd ? `/api/admin/mystatus-ads/${editingAd._id}` : '/api/admin/mystatus-ads';
 
       const response = await fetch(url, {
         method,
@@ -121,33 +98,29 @@ export default function AdvertisementsPage() {
           title: newAd.title,
           description: newAd.description,
           image: imageUrl,
-          rewardAmount: parseFloat(newAd.rewardAmount),
-          vendorId: newAd.vendorId,
-          verificationPeriodHours: parseInt(newAd.verificationPeriodHours) || 8,
+          category: newAd.category,
         }),
       });
       if (response.ok) {
-        await loadAdvertisements();
+        await loadMyStatusAds();
         setShowAddModal(false);
         setNewAd({
           title: '',
           description: '',
           image: '',
-          rewardAmount: '',
-          vendorId: '',
-          verificationPeriodHours: '8',
+          category: 'motivation',
         });
         setSelectedFile(null);
         setEditingAd(null);
       }
     } catch (error) {
-      console.error(`Error ${editingAd ? 'updating' : 'creating'} advertisement:`, error);
+      console.error(`Error ${editingAd ? 'updating' : 'creating'} MyStatus ad:`, error);
     }
   };
 
   const toggleAdStatus = async (adId: string) => {
     try {
-      const response = await fetch(`/api/admin/advertisements/${adId}/status`, {
+      const response = await fetch(`/api/admin/mystatus-ads/${adId}/status`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -156,47 +129,45 @@ export default function AdvertisementsPage() {
       });
 
       if (response.ok) {
-        setAdvertisements(prev => prev.map(ad =>
+        setMystatusAds(prev => prev.map(ad =>
           ad._id === adId
             ? { ...ad, isActive: !ad.isActive }
             : ad
         ));
       }
     } catch (error) {
-      console.error('Error toggling ad status:', error);
+      console.error('Error toggling mystatus ad status:', error);
     }
   };
 
-  const editAd = (ad: Advertisement) => {
+  const editAd = (ad: MyStatusAd) => {
     setEditingAd(ad);
     setSelectedFile(null);
     setNewAd({
       title: ad.title,
       description: ad.description,
       image: ad.image,
-      rewardAmount: ad.rewardAmount.toString(),
-      vendorId: ad.vendor._id,
-      verificationPeriodHours: ad.verificationPeriodHours.toString(),
+      category: ad.category,
     });
     setShowAddModal(true);
   };
 
   const deleteAd = async (adId: string) => {
-    if (!confirm('Are you sure you want to delete this advertisement? This action cannot be undone.')) {
+    if (!confirm('Are you sure you want to delete this MyStatus ad? This action cannot be undone.')) {
       return;
     }
 
     try {
-      const response = await fetch(`/api/admin/advertisements/${adId}`, {
+      const response = await fetch(`/api/admin/mystatus-ads/${adId}`, {
         method: 'DELETE',
         headers: getAuthHeaders(),
       });
 
       if (response.ok) {
-        await loadAdvertisements();
+        await loadMyStatusAds();
       }
     } catch (error) {
-      console.error('Error deleting ad:', error);
+      console.error('Error deleting mystatus ad:', error);
     }
   };
 
@@ -242,10 +213,10 @@ export default function AdvertisementsPage() {
     }
   };
 
-  const filteredAds = advertisements.filter(ad =>
+  const filteredAds = mystatusAds.filter(ad =>
     ad.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    ad.vendor.businessName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    ad.description.toLowerCase().includes(searchTerm.toLowerCase())
+    ad.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    ad.category.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   return (
@@ -253,27 +224,27 @@ export default function AdvertisementsPage() {
       {/* Header */}
       <div className="space-y-2">
         <div className="flex items-center space-x-3">
-          <div className="w-1 h-8 bg-gradient-to-b from-emerald-400 to-teal-500 rounded-full"></div>
+          <div className="w-1 h-8 bg-gradient-to-b from-purple-400 to-pink-500 rounded-full"></div>
           <h1 className="text-4xl font-bold bg-gradient-to-r from-slate-100 to-slate-300 bg-clip-text text-transparent">
-            Advertisement Management
+            MyStatus Ads Management
           </h1>
         </div>
         <p className="text-slate-400 text-lg font-medium">
-          Monitor and manage all advertisements on the platform
+          Create and manage motivational content for the MyStatus community
         </p>
       </div>
 
       {/* Stats Overview */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <div className="bg-gradient-to-br from-emerald-500/20 to-teal-600/20 backdrop-blur-xl rounded-2xl p-6 border border-emerald-500/20">
+        <div className="bg-gradient-to-br from-purple-500/20 to-pink-600/20 backdrop-blur-xl rounded-2xl p-6 border border-purple-500/20">
           <div className="flex items-center space-x-3">
-            <div className="w-12 h-12 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl flex items-center justify-center">
+            <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-pink-600 rounded-xl flex items-center justify-center">
               <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
               </svg>
             </div>
             <div>
-              <p className="text-2xl font-bold text-slate-100">{advertisements.length}</p>
+              <p className="text-2xl font-bold text-slate-100">{mystatusAds.length}</p>
               <p className="text-slate-400 text-sm">Total Ads</p>
             </div>
           </div>
@@ -286,7 +257,7 @@ export default function AdvertisementsPage() {
               </svg>
             </div>
             <div>
-              <p className="text-2xl font-bold text-slate-100">{advertisements.filter(ad => ad.isActive).length}</p>
+              <p className="text-2xl font-bold text-slate-100">{mystatusAds.filter(ad => ad.isActive).length}</p>
               <p className="text-slate-400 text-sm">Active Ads</p>
             </div>
           </div>
@@ -299,23 +270,23 @@ export default function AdvertisementsPage() {
               </svg>
             </div>
             <div>
-              <p className="text-2xl font-bold text-slate-100">{advertisements.reduce((sum, ad) => sum + ad.totalShares, 0)}</p>
+              <p className="text-2xl font-bold text-slate-100">{mystatusAds.reduce((sum, ad) => sum + ad.totalShares, 0)}</p>
               <p className="text-slate-400 text-sm">Total Shares</p>
             </div>
           </div>
         </div>
-        <div className="bg-gradient-to-br from-amber-500/20 to-orange-600/20 backdrop-blur-xl rounded-2xl p-6 border border-amber-500/20">
+        <div className="bg-gradient-to-br from-pink-500/20 to-rose-600/20 backdrop-blur-xl rounded-2xl p-6 border border-pink-500/20">
           <div className="flex items-center space-x-3">
-            <div className="w-12 h-12 bg-gradient-to-br from-amber-500 to-orange-600 rounded-xl flex items-center justify-center">
+            <div className="w-12 h-12 bg-gradient-to-br from-pink-500 to-rose-600 rounded-xl flex items-center justify-center">
               <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
               </svg>
             </div>
             <div>
               <p className="text-2xl font-bold text-slate-100">
-                ₹{advertisements.reduce((sum, ad) => sum + ad.totalRewardsPaid, 0).toLocaleString()}
+                {categories.length}
               </p>
-              <p className="text-slate-400 text-sm">Rewards Paid</p>
+              <p className="text-slate-400 text-sm">Categories</p>
             </div>
           </div>
         </div>
@@ -332,34 +303,34 @@ export default function AdvertisementsPage() {
             </div>
             <input
               type="text"
-              placeholder="Search advertisements by title, vendor, or description..."
+              placeholder="Search MyStatus ads by title, description, or category..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-12 pr-4 py-4 bg-slate-800/50 border border-slate-700/50 rounded-2xl text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500/50 transition-all duration-200"
+              className="w-full pl-12 pr-4 py-4 bg-slate-800/50 border border-slate-700/50 rounded-2xl text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 transition-all duration-200"
             />
           </div>
         </div>
         <div className="flex gap-4">
-          <select className="px-6 py-4 bg-slate-800/50 border border-slate-700/50 rounded-2xl text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all duration-200">
+          <select className="px-6 py-4 bg-slate-800/50 border border-slate-700/50 rounded-2xl text-slate-100 focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-all duration-200">
               <option value="">All Status</option>
               <option value="active">Active</option>
               <option value="inactive">Inactive</option>
             </select>
             <button
               onClick={() => setShowAddModal(true)}
-            className="group relative bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white px-6 py-4 rounded-2xl font-semibold shadow-lg shadow-emerald-500/25 hover:shadow-emerald-500/40 transition-all duration-300 hover:-translate-y-0.5"
+            className="group relative bg-gradient-to-r from-purple-500 to-pink-600 hover:from-purple-600 hover:to-pink-700 text-white px-6 py-4 rounded-2xl font-semibold shadow-lg shadow-purple-500/25 hover:shadow-purple-500/40 transition-all duration-300 hover:-translate-y-0.5"
           >
             <div className="flex items-center space-x-2">
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
               </svg>
-              <span>Add Advertisement</span>
+              <span>Add MyStatus Ad</span>
             </div>
             </button>
         </div>
       </div>
 
-      {/* Advertisements Grid */}
+      {/* MyStatus Ads Grid */}
       {loading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
           {[...Array(6)].map((_, i) => (
@@ -383,17 +354,17 @@ export default function AdvertisementsPage() {
         <div className="bg-gradient-to-br from-slate-800/50 to-slate-900/50 backdrop-blur-xl rounded-2xl p-12 border border-slate-700/50 text-center">
           <div className="w-24 h-24 bg-gradient-to-br from-slate-600 to-slate-700 rounded-2xl flex items-center justify-center mx-auto mb-6">
             <svg className="w-12 h-12 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
             </svg>
           </div>
-          <h3 className="text-2xl font-bold text-slate-100 mb-2">No Advertisements Found</h3>
+          <h3 className="text-2xl font-bold text-slate-100 mb-2">No MyStatus Ads Found</h3>
           <p className="text-slate-400 mb-6">
-            {searchTerm ? 'Try adjusting your search terms' : 'Get started by creating your first advertisement'}
+            {searchTerm ? 'Try adjusting your search terms' : 'Get started by creating your first motivational ad'}
           </p>
           {!searchTerm && (
             <button
               onClick={() => setShowAddModal(true)}
-              className="bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white px-8 py-3 rounded-xl font-semibold shadow-lg shadow-emerald-500/25 transition-all duration-300 hover:-translate-y-0.5"
+              className="bg-gradient-to-r from-purple-500 to-pink-600 hover:from-purple-600 hover:to-pink-700 text-white px-8 py-3 rounded-xl font-semibold shadow-lg shadow-purple-500/25 transition-all duration-300 hover:-translate-y-0.5"
             >
               Create First Ad
             </button>
@@ -406,26 +377,24 @@ export default function AdvertisementsPage() {
               {/* Status Indicator */}
               <div className="absolute top-4 right-4">
                 <div className={`w-3 h-3 rounded-full ${
-                  ad.isActive ? 'bg-emerald-400 shadow-lg shadow-emerald-400/50' : 'bg-red-400'
+                  ad.isActive ? 'bg-purple-400 shadow-lg shadow-purple-400/50' : 'bg-red-400'
                 }`}></div>
               </div>
 
               {/* Header */}
               <div className="flex items-start space-x-4 mb-6">
-                <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center shadow-lg">
+                <div className="w-16 h-16 bg-gradient-to-br from-purple-500 to-pink-600 rounded-2xl flex items-center justify-center shadow-lg">
                   <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
                   </svg>
                 </div>
                 <div className="flex-1">
                   <h3 className="text-xl font-bold text-slate-100 mb-1 line-clamp-2">{ad.title}</h3>
-                  <p className="text-slate-400 text-sm mb-1">{ad.vendor.businessName}</p>
+                  <p className="text-slate-400 text-sm mb-1 capitalize">{ad.category}</p>
                   <div className="flex items-center space-x-2">
-                    <span className="text-emerald-400 font-semibold">₹{ad.rewardAmount}</span>
+                    <span className="text-purple-400 font-semibold">Motivational</span>
                     <span className="text-slate-500">•</span>
-                    <span className="text-slate-500 text-sm">
-                      {ad.verificationPeriodHours === 0 ? 'Instant' : `${ad.verificationPeriodHours}h`} verify
-                    </span>
+                    <span className="text-slate-500 text-sm">No rewards</span>
                   </div>
                 </div>
               </div>
@@ -434,7 +403,7 @@ export default function AdvertisementsPage() {
               <p className="text-slate-300 text-sm mb-6 line-clamp-3">{ad.description}</p>
 
               {/* Stats Grid */}
-              <div className="grid grid-cols-3 gap-4 mb-6">
+              <div className="grid grid-cols-2 gap-4 mb-6">
                 <div className="bg-slate-700/30 rounded-xl p-4">
                   <div className="flex items-center space-x-2 mb-2">
                     <svg className="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -446,21 +415,12 @@ export default function AdvertisementsPage() {
                 </div>
                 <div className="bg-slate-700/30 rounded-xl p-4">
                   <div className="flex items-center space-x-2 mb-2">
-                    <svg className="w-4 h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    <svg className="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
                     </svg>
-                    <span className="text-xs font-medium text-slate-400">Verified</span>
+                    <span className="text-xs font-medium text-slate-400">Category</span>
                   </div>
-                  <p className="text-lg font-bold text-emerald-400">{ad.totalVerifiedShares}</p>
-                </div>
-                <div className="bg-slate-700/30 rounded-xl p-4">
-                  <div className="flex items-center space-x-2 mb-2">
-                    <svg className="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
-                    </svg>
-                    <span className="text-xs font-medium text-slate-400">Paid</span>
-                  </div>
-                  <p className="text-lg font-bold text-amber-400">₹{ad.totalRewardsPaid}</p>
+                  <p className="text-lg font-bold text-purple-400 capitalize">{ad.category}</p>
                 </div>
                   </div>
 
@@ -468,7 +428,7 @@ export default function AdvertisementsPage() {
               <div className="flex items-center justify-between">
                 <div className={`px-3 py-1 rounded-full text-xs font-semibold ${
                   ad.isActive
-                    ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                    ? 'bg-purple-500/20 text-purple-400 border border-purple-500/30'
                     : 'bg-red-500/20 text-red-400 border border-red-500/30'
                 }`}>
                   {ad.isActive ? 'Active' : 'Inactive'}
@@ -478,25 +438,16 @@ export default function AdvertisementsPage() {
                 <div className="flex space-x-2">
                   <button
                     onClick={() => toggleAdStatus(ad._id)}
-                    className={`px-3 py-2 rounded-xl text-xs font-medium transition-all duration-200 ${
+                    className={`px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200 ${
                       ad.isActive
                         ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30 border border-red-500/30'
-                        : 'bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 border border-emerald-500/30'
+                        : 'bg-purple-500/20 text-purple-400 hover:bg-purple-500/30 border border-purple-500/30'
                     }`}
                   >
                     {ad.isActive ? 'Deactivate' : 'Activate'}
                   </button>
-                  <button
-                    onClick={() => editAd(ad)}
-                    className="px-3 py-2 bg-blue-500/20 text-blue-400 hover:bg-blue-500/30 rounded-xl text-xs font-medium transition-all duration-200 border border-blue-500/30"
-                  >
+                  <button className="px-4 py-2 bg-slate-700/50 text-slate-300 hover:bg-slate-600/50 rounded-xl text-sm font-medium transition-all duration-200 border border-slate-600/50">
                     Edit
-                  </button>
-                  <button
-                    onClick={() => deleteAd(ad._id)}
-                    className="px-3 py-2 bg-red-500/20 text-red-400 hover:bg-red-500/30 rounded-xl text-xs font-medium transition-all duration-200 border border-red-500/30"
-                  >
-                    Delete
                   </button>
                 </div>
               </div>
@@ -505,45 +456,46 @@ export default function AdvertisementsPage() {
         </div>
       )}
 
-      {/* Add Advertisement Modal */}
+      {/* Add MyStatus Ad Modal */}
       {showAddModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
             <div className="p-6">
               <h3 className="text-xl font-semibold text-gray-900 mb-6">
-            {editingAd ? 'Edit Advertisement' : 'Add New Advertisement'}
-          </h3>
+                {editingAd ? 'Edit MyStatus Ad' : 'Add New MyStatus Ad'}
+              </h3>
 
               <form className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Title *
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      value={newAd.title}
-                      onChange={(e) => setNewAd(prev => ({ ...prev, title: e.target.value }))}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
-                      placeholder="Advertisement title"
-                    />
-                  </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Title *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={newAd.title}
+                    onChange={(e) => setNewAd(prev => ({ ...prev, title: e.target.value }))}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
+                    placeholder="Motivational title"
+                  />
+                </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Reward Amount (₹) *
-                    </label>
-                    <input
-                      type="number"
-                      required
-                      min="0"
-                      value={newAd.rewardAmount}
-                      onChange={(e) => setNewAd(prev => ({ ...prev, rewardAmount: e.target.value }))}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
-                      placeholder="50"
-                    />
-                  </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Category *
+                  </label>
+                  <select
+                    required
+                    value={newAd.category}
+                    onChange={(e) => setNewAd(prev => ({ ...prev, category: e.target.value }))}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
+                  >
+                    {categories.map((category) => (
+                      <option key={category.value} value={category.value}>
+                        {category.label}
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
                 <div>
@@ -555,45 +507,9 @@ export default function AdvertisementsPage() {
                     rows={4}
                     value={newAd.description}
                     onChange={(e) => setNewAd(prev => ({ ...prev, description: e.target.value }))}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
-                    placeholder="Describe your advertisement..."
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
+                    placeholder="Write an inspiring message..."
                   />
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Vendor *
-                    </label>
-                    <select
-                      required
-                      value={newAd.vendorId}
-                      onChange={(e) => setNewAd(prev => ({ ...prev, vendorId: e.target.value }))}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
-                    >
-                      <option value="">Select a vendor</option>
-                      {vendors.map((vendor) => (
-                        <option key={vendor._id} value={vendor._id}>
-                          {vendor.businessName}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Verification Period (hours) *
-                    </label>
-                    <input
-                      type="number"
-                      required
-                      min="1"
-                      max="24"
-                      value={newAd.verificationPeriodHours}
-                      onChange={(e) => setNewAd(prev => ({ ...prev, verificationPeriodHours: e.target.value }))}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
-                    />
-                  </div>
                 </div>
 
                 <div>
@@ -607,10 +523,10 @@ export default function AdvertisementsPage() {
                         accept="image/*"
                         onChange={handleFileSelect}
                         className="hidden"
-                        id="image-upload"
+                        id="mystatus-image-upload"
                       />
                       <label
-                        htmlFor="image-upload"
+                        htmlFor="mystatus-image-upload"
                         className="cursor-pointer flex flex-col items-center"
                       >
                         {selectedFile ? (
@@ -650,7 +566,7 @@ export default function AdvertisementsPage() {
                         setNewAd(prev => ({ ...prev, image: e.target.value }));
                         if (e.target.value) setSelectedFile(null); // Clear file if URL is entered
                       }}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
                       placeholder="https://example.com/image.jpg"
                     />
                   </div>
@@ -671,7 +587,7 @@ export default function AdvertisementsPage() {
                 <button
                   onClick={handleCreateAd}
                   disabled={uploading}
-                  className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed transition-colors flex items-center justify-center"
+                  className="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:bg-purple-400 disabled:cursor-not-allowed transition-colors flex items-center justify-center"
                 >
                   {uploading ? (
                     <>
@@ -682,7 +598,7 @@ export default function AdvertisementsPage() {
                       Uploading...
                     </>
                   ) : (
-                    editingAd ? 'Update Advertisement' : 'Create Advertisement'
+                    editingAd ? 'Update MyStatus Ad' : 'Create MyStatus Ad'
                   )}
                 </button>
               </div>

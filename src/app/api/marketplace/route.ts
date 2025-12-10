@@ -257,6 +257,10 @@ async function processMLMCommissions(buyerId: string, referrerId: string, amount
     if (rate && rate.keyPurchaseBonus > 0) {
       const commissionAmount = (amount * rate.keyPurchaseBonus) / 100;
 
+      // Get current balance before updating
+      const currentUser = await User.findById(chainItem.userId).session(session);
+      const balanceBefore = currentUser!.walletBalance;
+
       // Create commission record
       await Commission.create([{
         user: chainItem.userId,
@@ -275,16 +279,15 @@ async function processMLMCommissions(buyerId: string, referrerId: string, amount
         }
       }, { session });
 
-      // Create transaction record
-      const user = await User.findById(chainItem.userId).session(session);
+      // Create transaction record with correct balance values
       await Transaction.create([{
         user: chainItem.userId,
         type: 'credit',
         amount: commissionAmount,
         reason: 'referral_bonus',
         description: `Level ${chainItem.level} referral bonus`,
-        balanceBefore: user!.walletBalance,
-        balanceAfter: user!.walletBalance + commissionAmount
+        balanceBefore: balanceBefore,
+        balanceAfter: balanceBefore + commissionAmount
       }], { session });
     }
   }

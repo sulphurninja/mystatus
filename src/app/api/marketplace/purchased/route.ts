@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import connectToDatabase from '@/lib/mongodb';
 import ActivationKey from '@/models/ActivationKey';
+import Commission from '@/models/Commission';
+import User from '@/models/User';
 import { authenticateRequest } from '@/middleware/auth';
 
 export async function GET(request: NextRequest) {
@@ -27,31 +29,66 @@ export async function GET(request: NextRequest) {
       .populate('soldBy', 'name')
       .populate('usedBy', 'name')
       .populate('createdBy', 'name')
+      .populate('purchasedBy', 'name')
       .sort({ createdAt: -1 });
+
+    // Get commission data for keys that led to referrals
+    const keysWithCommissions = await Promise.all(
+      purchasedKeys.map(async (key) => {
+        let commissionInfo = null;
+
+        // If this key was used by someone and the current user created it (sold it),
+        // check if there are commissions earned from this referral
+        if (key.usedBy && key.createdBy && key.createdBy._id.toString() === auth.user!.id) {
+          // Find commissions earned from this referred user
+          const commissions = await Commission.find({
+            user: auth.user!.id,
+            referredUser: key.usedBy._id
+          }).sort({ createdAt: -1 });
+
+          if (commissions.length > 0) {
+            const totalCommission = commissions.reduce((sum, comm) => sum + comm.amount, 0);
+            commissionInfo = {
+              totalEarned: totalCommission,
+              commissionCount: commissions.length,
+              lastCommission: commissions[0].amount,
+              lastCommissionDate: commissions[0].createdAt
+            };
+          }
+        }
+
+        return {
+          id: key._id,
+          key: key.key,
+          price: key.price,
+          isUsed: key.isUsed,
+          soldAt: key.soldAt,
+          usedAt: key.usedAt,
+          soldBy: key.soldBy ? {
+            id: key.soldBy._id,
+            name: key.soldBy.name
+          } : null,
+          usedBy: key.usedBy ? {
+            id: key.usedBy._id,
+            name: key.usedBy.name
+          } : null,
+          purchasedBy: key.purchasedBy ? {
+            id: key.purchasedBy._id,
+            name: key.purchasedBy.name
+          } : null,
+          createdBy: key.createdBy ? {
+            id: key.createdBy._id,
+            name: key.createdBy.name
+          } : null,
+          status: getKeyStatus(key, auth.user!.id),
+          commissionInfo
+        };
+      })
+    );
 
     return NextResponse.json({
       success: true,
-      data: purchasedKeys.map(key => ({
-        id: key._id,
-        key: key.key,
-        price: key.price,
-        isUsed: key.isUsed,
-        soldAt: key.soldAt,
-        usedAt: key.usedAt,
-        soldBy: key.soldBy ? {
-          id: key.soldBy._id,
-          name: key.soldBy.name
-        } : null,
-        usedBy: key.usedBy ? {
-          id: key.usedBy._id,
-          name: key.usedBy.name
-        } : null,
-        createdBy: key.createdBy ? {
-          id: key.createdBy._id,
-          name: key.createdBy.name
-        } : null,
-        status: getKeyStatus(key)
-      }))
+      data: keysWithCommissions
     });
 
   } catch (error: any) {
@@ -63,14 +100,19 @@ export async function GET(request: NextRequest) {
   }
 }
 
-function getKeyStatus(key: any) {
+function getKeyStatus(key: any, currentUserId: string) {
   if (key.isUsed) {
-    return key.usedBy ? 'used_by_me' : 'used';
+    // Check if the current user is the one who used this key
+    if (key.usedBy && key.usedBy._id.toString() === currentUserId) {
+      return 'used_by_me';
+    }
+    // Key was used by someone else
+    return 'used';
   }
-  if (key.purchasedBy) {
+  if (key.purchasedBy && key.purchasedBy.toString() === currentUserId) {
     return 'purchased';
   }
-  if (key.soldBy) {
+  if (key.soldBy && key.soldBy.toString() === currentUserId) {
     return 'sold_by_me';
   }
   return 'available';

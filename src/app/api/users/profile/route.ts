@@ -36,6 +36,7 @@ export async function GET(request: NextRequest) {
         profileImage: user.profileImage,
         walletBalance: user.walletBalance,
         isActive: user.isActive,
+        canShareAds: user.canShareAds,
         createdAt: user.createdAt
       }
     });
@@ -93,7 +94,8 @@ export async function PUT(request: NextRequest) {
         activationKey: user.activationKey,
         referralCode: user.referralCode,
         profileImage: user.profileImage,
-        walletBalance: user.walletBalance
+        walletBalance: user.walletBalance,
+        canShareAds: user.canShareAds
       }
     });
 

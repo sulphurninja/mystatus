@@ -214,103 +214,91 @@ export default function VendorsPage() {
             </div>
           </div>
 
-          {/* Vendors Grid */}
-          <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-            {vendors.map((vendor) => (
-              <div key={vendor._id} className="group relative bg-gradient-to-br from-slate-800/50 to-slate-900/50 backdrop-blur-xl rounded-2xl p-6 border border-slate-700/50 hover:border-slate-600/50 transition-all duration-300 hover:shadow-2xl hover:shadow-slate-900/20 hover:-translate-y-1">
-                {/* Status Indicator */}
-                <div className="absolute top-4 right-4">
-                  <div className={`w-3 h-3 rounded-full ${
-                    vendor.isActive ? 'bg-emerald-400 shadow-lg shadow-emerald-400/50' : 'bg-red-400'
-                  }`}></div>
-                </div>
-
-                {/* Header */}
-                <div className="flex items-start space-x-4 mb-6">
-                  <div className="w-16 h-16 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-2xl flex items-center justify-center shadow-lg">
-                    <span className="text-2xl font-bold text-white">
-                      {vendor.name.charAt(0).toUpperCase()}
-                    </span>
-                  </div>
-                  <div className="flex-1">
-                    <h3 className="text-xl font-bold text-slate-100 mb-1">{vendor.name}</h3>
-                    <p className="text-slate-400 text-sm mb-1">{vendor.businessName}</p>
-                    <p className="text-slate-500 text-sm">{vendor.email}</p>
-                    {vendor.phone && (
-                      <p className="text-slate-500 text-sm">{vendor.phone}</p>
-                    )}
-                  </div>
-                </div>
-
-                {/* Stats Grid */}
-                <div className="grid grid-cols-2 gap-4 mb-6">
-                  <div className="bg-slate-700/30 rounded-xl p-4">
-                    <div className="flex items-center space-x-2 mb-2">
-                      <svg className="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
-                      </svg>
-                      <span className="text-xs font-medium text-slate-400">Balance</span>
-                    </div>
-                    <p className="text-lg font-bold text-slate-100">₹{vendor.walletBalance}</p>
-                  </div>
-                  <div className="bg-slate-700/30 rounded-xl p-4">
-                    <div className="flex items-center space-x-2 mb-2">
-                      <svg className="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z" />
-                      </svg>
-                      <span className="text-xs font-medium text-slate-400">Ads</span>
-                    </div>
-                    <p className="text-lg font-bold text-slate-100">{vendor.totalAds}</p>
-                  </div>
-                  <div className="bg-slate-700/30 rounded-xl p-4">
-                    <div className="flex items-center space-x-2 mb-2">
-                      <svg className="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.367 2.684 3 3 0 00-5.367-2.684z" />
-                      </svg>
-                      <span className="text-xs font-medium text-slate-400">Shares</span>
-                    </div>
-                    <p className="text-lg font-bold text-slate-100">{vendor.totalShares}</p>
-                  </div>
-                  <div className="bg-slate-700/30 rounded-xl p-4">
-                    <div className="flex items-center space-x-2 mb-2">
-                      <svg className="w-4 h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-                      </svg>
-                      <span className="text-xs font-medium text-slate-400">Earnings</span>
-                    </div>
-                    <p className="text-lg font-bold text-emerald-400">₹{vendor.totalEarnings}</p>
-                  </div>
-                </div>
-
-                {/* Status Badge */}
-                <div className="flex items-center justify-between">
-                  <div className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                    vendor.isActive
-                      ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                      : 'bg-red-500/20 text-red-400 border border-red-500/30'
-                  }`}>
-                    {vendor.isActive ? 'Active' : 'Inactive'}
-                  </div>
-
-                  {/* Actions */}
-                  <div className="flex space-x-2">
-                    <button
-                      onClick={() => toggleVendorStatus(vendor._id)}
-                      className={`px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200 ${
-                        vendor.isActive
-                          ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30 border border-red-500/30'
-                          : 'bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 border border-emerald-500/30'
-                      }`}
-                    >
-                      {vendor.isActive ? 'Deactivate' : 'Activate'}
-                    </button>
-                    <button className="px-4 py-2 bg-slate-700/50 text-slate-300 hover:bg-slate-600/50 rounded-xl text-sm font-medium transition-all duration-200 border border-slate-600/50">
-                      Edit
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ))}
+          {/* Vendors Table */}
+          <div className="bg-gradient-to-br from-slate-800/50 to-slate-900/50 backdrop-blur-xl rounded-2xl border border-slate-700/50 overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="min-w-full text-left text-sm text-slate-200">
+                <thead className="bg-slate-800/80 text-slate-300">
+                  <tr>
+                    <th className="px-6 py-4 font-semibold">Vendor</th>
+                    <th className="px-6 py-4 font-semibold">Business</th>
+                    <th className="px-6 py-4 font-semibold">Contact</th>
+                    <th className="px-6 py-4 font-semibold">Balance</th>
+                    <th className="px-6 py-4 font-semibold">Ads</th>
+                    <th className="px-6 py-4 font-semibold">Shares</th>
+                    <th className="px-6 py-4 font-semibold">Earnings</th>
+                    <th className="px-6 py-4 font-semibold">Status</th>
+                    <th className="px-6 py-4 font-semibold">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-700/50">
+                  {vendors.map((vendor) => (
+                    <tr key={vendor._id} className="hover:bg-slate-800/40 transition-colors">
+                      <td className="px-6 py-4">
+                        <div className="flex items-center space-x-3">
+                          <div className="w-10 h-10 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl flex items-center justify-center shadow-lg">
+                            <span className="text-lg font-bold text-white">
+                              {vendor.name.charAt(0).toUpperCase()}
+                            </span>
+                          </div>
+                          <div>
+                            <p className="font-semibold text-slate-100">{vendor.name}</p>
+                            <p className="text-xs text-slate-400">ID: {vendor._id.slice(-8)}</p>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <p className="text-slate-100 font-medium">{vendor.businessName}</p>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div>
+                          <p className="text-slate-100">{vendor.email}</p>
+                          {vendor.phone && <p className="text-slate-400 text-sm">{vendor.phone}</p>}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className="font-semibold text-emerald-400">₹{vendor.walletBalance}</span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className="text-slate-100">{vendor.totalAds}</span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className="text-slate-100">{vendor.totalShares}</span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className="font-semibold text-emerald-400">₹{vendor.totalEarnings}</span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                          vendor.isActive
+                            ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                            : 'bg-red-500/20 text-red-300 border border-red-500/30'
+                        }`}>
+                          {vendor.isActive ? 'Active' : 'Inactive'}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center space-x-2">
+                          <button
+                            onClick={() => toggleVendorStatus(vendor._id)}
+                            className={`px-3 py-1 rounded-lg text-xs font-medium transition-all duration-200 ${
+                              vendor.isActive
+                                ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30 border border-red-500/30'
+                                : 'bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 border border-emerald-500/30'
+                            }`}
+                          >
+                            {vendor.isActive ? 'Deactivate' : 'Activate'}
+                          </button>
+                          <button className="px-3 py-1 bg-slate-700/50 text-slate-300 hover:bg-slate-600/50 rounded-lg text-xs font-medium transition-all duration-200 border border-slate-600/50">
+                            Edit
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       )}

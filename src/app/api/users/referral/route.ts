@@ -42,6 +42,29 @@ export async function GET(request: NextRequest) {
       isActive: true
     });
 
+    // Get commission rates for all levels
+    const commissionRates = await CommissionRate.find({ isActive: true }).sort({ level: 1 });
+
+    // Get commission breakdown by level
+    const commissionBreakdown = [];
+    for (let level = 1; level <= 6; level++) {
+      const levelCommissions = await Commission.find({
+        user: user._id,
+        level: level
+      });
+
+      const levelRate = commissionRates.find(rate => rate.level === level);
+
+      commissionBreakdown.push({
+        level,
+        referralBonus: levelRate?.referralBonus || 0,
+        levelBonus: levelRate?.levelBonus || 0,
+        keyPurchaseBonus: levelRate?.keyPurchaseBonus || 0,
+        totalEarned: levelCommissions.reduce((sum, comm) => sum + comm.amount, 0),
+        totalCommissions: levelCommissions.length
+      });
+    }
+
     return NextResponse.json({
       success: true,
       data: {
@@ -65,7 +88,8 @@ export async function GET(request: NextRequest) {
           totalReferrals,
           activeReferrals,
           pendingReferrals: totalReferrals - activeReferrals
-        }
+        },
+        commissionBreakdown
       }
     });
 

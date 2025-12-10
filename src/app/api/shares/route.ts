@@ -126,12 +126,12 @@ export async function GET(request: NextRequest) {
       success: true,
       data: shares.map(share => ({
         id: share._id,
-        advertisement: {
+        advertisement: share.advertisement ? {
           id: share.advertisement._id,
           title: share.advertisement.title,
           image: share.advertisement.image,
           rewardAmount: share.advertisement.rewardAmount
-        },
+        } : null,
         sharedAt: share.sharedAt,
         verificationDeadline: share.verificationDeadline,
         status: share.status,

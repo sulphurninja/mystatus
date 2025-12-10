@@ -9,6 +9,7 @@ export interface IUser extends Document {
   profileImage?: string;
   walletBalance: number;
   isActive: boolean;
+  canShareAds: boolean;
   // MLM Fields
   referredBy?: mongoose.Types.ObjectId;
   referralCode: string;
@@ -61,6 +62,10 @@ const UserSchema: Schema = new Schema({
     type: Boolean,
     default: true
   },
+  canShareAds: {
+    type: Boolean,
+    default: false
+  },
   // MLM Fields
   referredBy: {
     type: mongoose.Schema.Types.ObjectId,
@@ -102,6 +107,26 @@ const UserSchema: Schema = new Schema({
 //   const salt = await bcrypt.genSalt(10);
 //   this.password = await bcrypt.hash(this.password, salt);
 // });
+
+// Check if user can share vendor ads (8 days after registration or manually activated)
+UserSchema.methods.canShareVendorAds = function(): boolean {
+  // If manually activated by admin, allow immediately
+  if (this.canShareAds) {
+    return true;
+  }
+
+  const eightDaysMs = 8 * 24 * 60 * 60 * 1000; // 8 days in milliseconds
+  const timeSinceRegistration = Date.now() - this.createdAt.getTime();
+  return timeSinceRegistration >= eightDaysMs;
+};
+
+// Get days remaining until user can share vendor ads
+UserSchema.methods.getDaysUntilCanShare = function(): number {
+  const eightDaysMs = 8 * 24 * 60 * 60 * 1000; // 8 days in milliseconds
+  const timeSinceRegistration = Date.now() - this.createdAt.getTime();
+  const remainingMs = eightDaysMs - timeSinceRegistration;
+  return Math.max(0, Math.ceil(remainingMs / (24 * 60 * 60 * 1000)));
+};
 
 // Compare password method
 UserSchema.methods.comparePassword = async function(candidatePassword: string): Promise<boolean> {

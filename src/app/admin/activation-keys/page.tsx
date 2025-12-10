@@ -116,6 +116,60 @@ export default function ActivationKeysPage() {
   const usedCount = keys.filter(key => key.isUsed).length;
   const unusedCount = keys.filter(key => !key.isUsed).length;
 
+  const toggleKeyForSale = async (keyId: string) => {
+    try {
+      const response = await fetch(`/api/admin/activation-keys/${keyId}/toggle-sale`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          ...getAuthHeaders(),
+        },
+      });
+
+      if (response.ok) {
+        await loadActivationKeys();
+      }
+    } catch (error) {
+      console.error('Error toggling key sale status:', error);
+    }
+  };
+
+  const exportToCSV = () => {
+    const csvData = keys.map(key => ({
+      'Key': key.key,
+      'Status': key.isUsed ? 'Used' : key.isForSale ? 'For Sale' : 'Generated',
+      'Price': key.price,
+      'For Sale': key.isForSale ? 'Yes' : 'No',
+      'Used By': key.usedBy ? key.usedBy.name : '',
+      'User Email': key.usedBy?.email || '',
+      'Purchased By': key.purchasedBy ? key.purchasedBy.name : '',
+      'Purchaser Email': key.purchasedBy?.email || '',
+      'Sold By': key.soldBy ? key.soldBy.name : '',
+      'Seller Email': key.soldBy?.email || '',
+      'Created Date': new Date(key.createdAt).toLocaleDateString(),
+      'Used Date': key.usedAt ? new Date(key.usedAt).toLocaleDateString() : '',
+      'Purchased Date': key.purchasedAt ? new Date(key.purchasedAt).toLocaleDateString() : '',
+      'Sold Date': key.soldAt ? new Date(key.soldAt).toLocaleDateString() : '',
+    }));
+
+    const csvString = [
+      Object.keys(csvData[0]).join(','),
+      ...csvData.map(row => Object.values(row).map(value =>
+        typeof value === 'string' && value.includes(',') ? `"${value}"` : value
+      ).join(','))
+    ].join('\n');
+
+    const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `activation_keys_export_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   return (
     <div className="p-6 lg:p-8 space-y-8">
       {/* Header */}
@@ -189,8 +243,19 @@ export default function ActivationKeysPage() {
         </div>
       </div>
 
-      {/* Generate Keys Button */}
-      <div className="flex justify-end">
+      {/* Action Buttons */}
+      <div className="flex justify-end gap-4">
+        <button
+          onClick={exportToCSV}
+          className="group relative bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white px-6 py-3 rounded-2xl font-semibold shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 transition-all duration-300 hover:-translate-y-0.5"
+        >
+          <div className="flex items-center space-x-2">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+            <span>Export CSV</span>
+          </div>
+        </button>
         <button
           onClick={() => setShowGenerateModal(true)}
           className="group relative bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white px-6 py-3 rounded-2xl font-semibold shadow-lg shadow-emerald-500/25 hover:shadow-emerald-500/40 transition-all duration-300 hover:-translate-y-0.5"

@@ -7,5 +7,9 @@ import './Transaction';
 import './Commission';
 import './CommissionRate';
 import './ActivationKey';
+import './MyStatusAd';
+import './MyStatusShare';
 
 export {};
+
+

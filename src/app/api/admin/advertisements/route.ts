@@ -76,6 +76,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Validate vendor exists
+    const vendor = await Vendor.findById(vendorId);
+    if (!vendor) {
+      return NextResponse.json(
+        { success: false, message: 'Invalid vendor selected' },
+        { status: 400 }
+      );
+    }
+
     // Create advertisement
     const advertisement = await Advertisement.create({
       title: title.trim(),
@@ -113,6 +122,24 @@ export async function POST(request: NextRequest) {
 
   } catch (error: any) {
     console.error('Create advertisement error:', error);
+
+    // Handle validation errors
+    if (error.name === 'ValidationError') {
+      const messages = Object.values(error.errors).map((err: any) => err.message);
+      return NextResponse.json(
+        { success: false, message: messages.join(', ') },
+        { status: 400 }
+      );
+    }
+
+    // Handle duplicate key errors
+    if (error.code === 11000) {
+      return NextResponse.json(
+        { success: false, message: 'Duplicate entry found' },
+        { status: 400 }
+      );
+    }
+
     return NextResponse.json(
       { success: false, message: 'Server error', error: error.message },
       { status: 500 }

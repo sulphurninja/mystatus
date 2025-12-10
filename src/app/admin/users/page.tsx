@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 
 interface User {
   _id: string;
@@ -10,6 +11,9 @@ interface User {
   activationKey: string;
   walletBalance: number;
   isActive: boolean;
+  canShareAds: boolean;
+  referralLevel?: number;
+  totalCommissionEarned?: number;
   createdAt: string;
 }
 
@@ -20,9 +24,9 @@ export default function UsersPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalUsers, setTotalUsers] = useState(0);
 
-  const getAuthHeaders = () => {
+  const getAuthHeaders = (): Record<string, string> => {
     const token = typeof window !== 'undefined' ? localStorage.getItem('adminToken') : null;
-    return token ? { Authorization: `Bearer ${token}` } : {};
+    return token ? { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } : { 'Content-Type': 'application/json' };
   };
 
   useEffect(() => {
@@ -33,10 +37,7 @@ export default function UsersPage() {
     try {
       setLoading(true);
       const response = await fetch(`/api/admin/users?page=${currentPage}&search=${searchTerm}`, {
-        headers: {
-          'Content-Type': 'application/json',
-          ...getAuthHeaders(),
-        },
+        headers: getAuthHeaders(),
       });
       if (response.ok) {
         const data = await response.json();
@@ -61,11 +62,62 @@ export default function UsersPage() {
     ));
   };
 
+  const toggleUserAdsPermission = async (userId: string) => {
+    try {
+      const response = await fetch(`/api/admin/users/${userId}/ads-permission`, {
+        method: 'PUT',
+        headers: getAuthHeaders(),
+      });
+
+      if (response.ok) {
+        setUsers(prev => prev.map(user =>
+          user._id === userId
+            ? { ...user, canShareAds: !user.canShareAds }
+            : user
+        ));
+      }
+    } catch (error) {
+      console.error('Error toggling user ads permission:', error);
+    }
+  };
+
   const filteredUsers = users.filter(user =>
     user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     user.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     user.activationKey.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  const exportToCSV = () => {
+    const csvData = filteredUsers.map(user => ({
+      'User ID': user._id,
+      'Name': user.name,
+      'Email': user.email || '',
+      'Phone': user.phone || '',
+      'Activation Key': user.activationKey,
+      'Wallet Balance': user.walletBalance,
+      'Status': user.isActive ? 'Active' : 'Inactive',
+      'Joined Date': new Date(user.createdAt).toLocaleDateString(),
+      'Referral Level': user.referralLevel || 1,
+      'Total Commission Earned': user.totalCommissionEarned || 0
+    }));
+
+    const csvString = [
+      Object.keys(csvData[0]).join(','),
+      ...csvData.map(row => Object.values(row).map(value =>
+        typeof value === 'string' && value.includes(',') ? `"${value}"` : value
+      ).join(','))
+    ].join('\n');
+
+    const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `users_export_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   return (
     <div className="p-6 lg:p-8 space-y-8">
@@ -164,7 +216,10 @@ export default function UsersPage() {
             <option value="active">Active</option>
             <option value="inactive">Inactive</option>
           </select>
-          <button className="group relative bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white px-6 py-4 rounded-2xl font-semibold shadow-lg shadow-emerald-500/25 hover:shadow-emerald-500/40 transition-all duration-300 hover:-translate-y-0.5">
+          <button
+            onClick={exportToCSV}
+            className="group relative bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white px-6 py-4 rounded-2xl font-semibold shadow-lg shadow-emerald-500/25 hover:shadow-emerald-500/40 transition-all duration-300 hover:-translate-y-0.5"
+          >
             <div className="flex items-center space-x-2">
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -208,83 +263,106 @@ export default function UsersPage() {
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-          {users.map((user) => (
-            <div key={user._id} className="group relative bg-gradient-to-br from-slate-800/50 to-slate-900/50 backdrop-blur-xl rounded-2xl p-6 border border-slate-700/50 hover:border-slate-600/50 transition-all duration-300 hover:shadow-2xl hover:shadow-slate-900/20 hover:-translate-y-1">
-              {/* Status Indicator */}
-              <div className="absolute top-4 right-4">
-                <div className={`w-3 h-3 rounded-full ${
-                  user.isActive ? 'bg-emerald-400 shadow-lg shadow-emerald-400/50' : 'bg-red-400'
-                }`}></div>
-              </div>
-
-              {/* Header */}
-              <div className="flex items-start space-x-4 mb-6">
-                <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center shadow-lg">
-                  <span className="text-2xl font-bold text-white">
-                    {user.name.charAt(0).toUpperCase()}
-                  </span>
-                </div>
-                <div className="flex-1">
-                  <h3 className="text-xl font-bold text-slate-100 mb-1">{user.name}</h3>
-                  <p className="text-slate-400 text-sm mb-1">{user.email}</p>
-                  {user.phone && (
-                    <p className="text-slate-500 text-sm">{user.phone}</p>
-                  )}
-                </div>
-              </div>
-
-              {/* Stats Grid */}
-              <div className="grid grid-cols-2 gap-4 mb-6">
-                <div className="bg-slate-700/30 rounded-xl p-4">
-                  <div className="flex items-center space-x-2 mb-2">
-                    <svg className="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
-                    </svg>
-                    <span className="text-xs font-medium text-slate-400">Balance</span>
-                  </div>
-                  <p className="text-lg font-bold text-slate-100">₹{user.walletBalance}</p>
-                </div>
-                <div className="bg-slate-700/30 rounded-xl p-4">
-                  <div className="flex items-center space-x-2 mb-2">
-                    <svg className="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
-                    </svg>
-                    <span className="text-xs font-medium text-slate-400">Key</span>
-                  </div>
-                  <p className="text-sm font-bold text-slate-100 truncate">{user.activationKey || 'Not Activated'}</p>
-                </div>
-              </div>
-
-              {/* Status Badge */}
-              <div className="flex items-center justify-between">
-                <div className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                  user.isActive
-                    ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                    : 'bg-red-500/20 text-red-400 border border-red-500/30'
-                }`}>
-                  {user.isActive ? 'Active' : 'Inactive'}
-                </div>
-
-                {/* Actions */}
-                <div className="flex space-x-2">
-                  <button
-                    onClick={() => toggleUserStatus(user._id)}
-                    className={`px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200 ${
-                      user.isActive
-                        ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30 border border-red-500/30'
-                        : 'bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 border border-emerald-500/30'
-                    }`}
-                  >
-                    {user.isActive ? 'Deactivate' : 'Activate'}
-                  </button>
-                  <button className="px-4 py-2 bg-slate-700/50 text-slate-300 hover:bg-slate-600/50 rounded-xl text-sm font-medium transition-all duration-200 border border-slate-600/50">
-                    Edit
-                  </button>
-                </div>
-              </div>
-            </div>
-          ))}
+        <div className="bg-gradient-to-br from-slate-800/50 to-slate-900/50 backdrop-blur-xl rounded-2xl border border-slate-700/50 overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-left text-sm text-slate-200">
+              <thead className="bg-slate-800/80 text-slate-300">
+                <tr>
+                  <th className="px-6 py-4 font-semibold">User</th>
+                  <th className="px-6 py-4 font-semibold">Contact</th>
+                  <th className="px-6 py-4 font-semibold">Activation Key</th>
+                  <th className="px-6 py-4 font-semibold">Balance</th>
+                  <th className="px-6 py-4 font-semibold">Status</th>
+                  <th className="px-6 py-4 font-semibold">Ad Sharing</th>
+                  <th className="px-6 py-4 font-semibold">Joined</th>
+                  <th className="px-6 py-4 font-semibold">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-700/50">
+                {users.map((user) => (
+                  <tr key={user._id} className="hover:bg-slate-800/40 transition-colors">
+                    <td className="px-6 py-4">
+                      <Link href={`/admin/users/${user._id}`} className="flex items-center space-x-4 hover:opacity-80 transition-opacity">
+                        <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg">
+                          <span className="text-lg font-bold text-white">
+                            {user.name.charAt(0).toUpperCase()}
+                          </span>
+                        </div>
+                        <div>
+                          <p className="font-semibold text-slate-100 hover:text-emerald-400 transition-colors">{user.name}</p>
+                          <p className="text-xs text-slate-400">ID: {user._id.slice(-8)}</p>
+                        </div>
+                      </Link>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div>
+                        <p className="text-slate-100">{user.email || '-'}</p>
+                        {user.phone && <p className="text-slate-400 text-sm">{user.phone}</p>}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <code className="text-xs font-mono bg-slate-800/70 px-2 py-1 rounded text-slate-300">
+                        {user.activationKey || 'Not Activated'}
+                      </code>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className="font-semibold text-emerald-400">₹{user.walletBalance}</span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                        user.isActive
+                          ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                          : 'bg-red-500/20 text-red-300 border border-red-500/30'
+                      }`}>
+                        {user.isActive ? 'Active' : 'Inactive'}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                        user.canShareAds
+                          ? 'bg-green-500/20 text-green-300 border border-green-500/30'
+                          : 'bg-yellow-500/20 text-yellow-300 border border-yellow-500/30'
+                      }`}>
+                        {user.canShareAds ? 'Enabled' : 'Waiting'}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-slate-300">
+                      {new Date(user.createdAt).toLocaleDateString()}
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center space-x-2">
+                        <button
+                          onClick={() => toggleUserStatus(user._id)}
+                          className={`px-3 py-1 rounded-lg text-xs font-medium transition-all duration-200 ${
+                            user.isActive
+                              ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30 border border-red-500/30'
+                              : 'bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 border border-emerald-500/30'
+                          }`}
+                        >
+                          {user.isActive ? 'Deactivate' : 'Activate'}
+                        </button>
+                        <button
+                          onClick={() => toggleUserAdsPermission(user._id)}
+                          className={`px-3 py-1 rounded-lg text-xs font-medium transition-all duration-200 ${
+                            user.canShareAds
+                              ? 'bg-yellow-500/20 text-yellow-400 hover:bg-yellow-500/30 border border-yellow-500/30'
+                              : 'bg-green-500/20 text-green-400 hover:bg-green-500/30 border border-green-500/30'
+                          }`}
+                        >
+                          {user.canShareAds ? 'Disable Ads' : 'Enable Ads'}
+                        </button>
+                        <Link href={`/admin/users/${user._id}`}>
+                          <button className="px-3 py-1 bg-slate-700/50 text-slate-300 hover:bg-slate-600/50 rounded-lg text-xs font-medium transition-all duration-200 border border-slate-600/50">
+                            View
+                          </button>
+                        </Link>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
