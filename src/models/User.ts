@@ -5,7 +5,7 @@ export interface IUser extends Document {
   name: string;
   email?: string;
   phone?: string;
-  activationKey: string;
+  activationKey?: string; // Now optional - added during withdrawal
   profileImage?: string;
   walletBalance: number;
   isActive: boolean;
@@ -46,8 +46,8 @@ const UserSchema: Schema = new Schema({
   },
   activationKey: {
     type: String,
-    required: [true, 'Activation key is required'],
     unique: true,
+    sparse: true, // Allow multiple null values
     index: true
   },
   profileImage: {

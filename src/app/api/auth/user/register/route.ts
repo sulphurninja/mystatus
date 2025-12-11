@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import connectToDatabase from '@/lib/mongodb';
 import User from '@/models/User';
-import ActivationKey from '@/models/ActivationKey';
 import Commission from '@/models/Commission';
 import CommissionRate from '@/models/CommissionRate';
 import Transaction from '@/models/Transaction';
@@ -12,12 +11,12 @@ export async function POST(request: NextRequest) {
   try {
     await connectToDatabase();
 
-    const { name, activationKey, email, phone, profileImage, referralCode } = await request.json();
+    const { name, email, phone, profileImage, referralCode } = await request.json();
 
     // Validate required fields
-    if (!name || !activationKey) {
+    if (!name) {
       return NextResponse.json(
-        { success: false, message: 'Name and activation key are required' },
+        { success: false, message: 'Name is required' },
         { status: 400 }
       );
     }
@@ -26,26 +25,6 @@ export async function POST(request: NextRequest) {
     if (!referralCode || !referralCode.trim()) {
       return NextResponse.json(
         { success: false, message: 'Referral code is required. Ask a friend who uses MyStatus for their code.' },
-        { status: 400 }
-      );
-    }
-
-    if (activationKey.length < 8 || activationKey.length > 12) {
-      return NextResponse.json(
-        { success: false, message: 'Activation key must be 8-12 characters long' },
-        { status: 400 }
-      );
-    }
-
-    // Check if activation key exists and is not used
-    const key = await ActivationKey.findOne({
-      key: activationKey.toUpperCase(),
-      isUsed: false
-    });
-
-    if (!key) {
-      return NextResponse.json(
-        { success: false, message: 'Invalid or already used activation key' },
         { status: 400 }
       );
     }
@@ -75,24 +54,16 @@ export async function POST(request: NextRequest) {
         referralCodeGenerated = Math.random().toString(36).substring(2, 8).toUpperCase();
       } while (await User.findOne({ referralCode: referralCodeGenerated }).session(dbSession));
 
-      // Create user
+      // Create user (without activation key - user will add it during withdrawal)
       const user = await User.create([{
         name: name.trim(),
         email: email?.trim() || undefined,
         phone: phone?.trim() || undefined,
-        activationKey: activationKey.toUpperCase(),
         profileImage,
         referredBy: referrer?._id,
         referralCode: referralCodeGenerated,
         referralLevel: 1
       }], { session: dbSession });
-
-      // Mark activation key as used
-      await ActivationKey.findByIdAndUpdate(key._id, {
-        isUsed: true,
-        usedBy: user[0]._id,
-        usedAt: new Date()
-      }, { session: dbSession });
 
       // Process referral commission if referrer exists
       if (referrer) {
@@ -123,7 +94,7 @@ export async function POST(request: NextRequest) {
             name: user[0].name,
             email: user[0].email,
             phone: user[0].phone,
-            activationKey: user[0].activationKey,
+            referralCode: user[0].referralCode,
             profileImage: user[0].profileImage,
             walletBalance: user[0].walletBalance
           },
@@ -149,7 +120,7 @@ export async function POST(request: NextRequest) {
     // Handle duplicate key errors
     if (error.code === 11000) {
       return NextResponse.json(
-        { success: false, message: 'Activation key already used or user already exists' },
+        { success: false, message: 'User with this email or phone already exists' },
         { status: 400 }
       );
     }

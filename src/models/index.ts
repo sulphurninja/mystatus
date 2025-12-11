@@ -9,6 +9,7 @@ import './CommissionRate';
 import './ActivationKey';
 import './MyStatusAd';
 import './MyStatusShare';
+import './WithdrawalRequest';
 
 export {};
 
