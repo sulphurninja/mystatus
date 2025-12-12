@@ -24,3 +24,4 @@ export default async function ReferralLandingPage({ params }: Props) {
   return <ReferralLandingClient referralCode={code} />;
 }
 
+

@@ -4,15 +4,23 @@ import User from '@/models/User';
 import ActivationKey from '@/models/ActivationKey';
 import WithdrawalRequest from '@/models/WithdrawalRequest';
 import Transaction from '@/models/Transaction';
-import { verifyToken } from '@/middleware/auth';
+import { verifyToken, getTokenFromRequest } from '@/middleware/auth';
 import mongoose from 'mongoose';
 
-// GET - Get user's withdrawal requests
+// GET - Get user's withdrawal requests and key status
 export async function GET(request: NextRequest) {
   try {
     await connectToDatabase();
 
-    const decoded = await verifyToken(request);
+    const token = getTokenFromRequest(request);
+    if (!token) {
+      return NextResponse.json(
+        { success: false, message: 'Unauthorized' },
+        { status: 401 }
+      );
+    }
+
+    const decoded = verifyToken(token);
     if (!decoded || decoded.type !== 'user') {
       return NextResponse.json(
         { success: false, message: 'Unauthorized' },
@@ -20,7 +28,33 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const userId = decoded.userId;
+    const userId = decoded.id;
+
+    // Get user and their activation key status
+    const user = await User.findById(userId);
+    let keyStatus = null;
+
+    if (user?.activationKey) {
+      const key = await ActivationKey.findOne({ 
+        key: user.activationKey,
+        usedBy: userId 
+      });
+      
+      if (key) {
+        const remainingLimit = key.withdrawalLimit - key.totalWithdrawn;
+        keyStatus = {
+          hasKey: true,
+          key: key.key,
+          totalWithdrawn: key.totalWithdrawn,
+          withdrawalLimit: key.withdrawalLimit,
+          remainingLimit: remainingLimit,
+          isPaused: key.isPaused,
+          renewalCount: key.renewalCount,
+          needsRenewal: key.isPaused || remainingLimit <= 0,
+          renewalPrice: key.price
+        };
+      }
+    }
 
     const withdrawalRequests = await WithdrawalRequest.find({ user: userId })
       .sort({ createdAt: -1 })
@@ -28,16 +62,19 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      data: withdrawalRequests.map(req => ({
-        id: req._id,
-        amount: req.amount,
-        status: req.status,
-        activationKey: req.activationKey,
-        requestedAt: req.requestedAt,
-        processedAt: req.processedAt,
-        rejectionReason: req.rejectionReason,
-        paymentDetails: req.paymentDetails
-      }))
+      data: {
+        keyStatus: keyStatus || { hasKey: false },
+        withdrawalRequests: withdrawalRequests.map(req => ({
+          id: req._id,
+          amount: req.amount,
+          status: req.status,
+          activationKey: req.activationKey,
+          requestedAt: req.requestedAt,
+          processedAt: req.processedAt,
+          rejectionReason: req.rejectionReason,
+          paymentDetails: req.paymentDetails
+        }))
+      }
     });
   } catch (error: any) {
     console.error('Get withdrawal requests error:', error);
@@ -53,7 +90,15 @@ export async function POST(request: NextRequest) {
   try {
     await connectToDatabase();
 
-    const decoded = await verifyToken(request);
+    const token = getTokenFromRequest(request);
+    if (!token) {
+      return NextResponse.json(
+        { success: false, message: 'Unauthorized' },
+        { status: 401 }
+      );
+    }
+
+    const decoded = verifyToken(token);
     if (!decoded || decoded.type !== 'user') {
       return NextResponse.json(
         { success: false, message: 'Unauthorized' },
@@ -61,21 +106,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const userId = decoded.userId;
+    const userId = decoded.id;
     const { amount, activationKey, paymentDetails } = await request.json();
 
     // Validate amount
     if (!amount || amount <= 0) {
       return NextResponse.json(
         { success: false, message: 'Invalid withdrawal amount' },
-        { status: 400 }
-      );
-    }
-
-    // Validate activation key
-    if (!activationKey || activationKey.length < 6 || activationKey.length > 8) {
-      return NextResponse.json(
-        { success: false, message: 'Valid activation key is required for withdrawal' },
         { status: 400 }
       );
     }
@@ -119,39 +156,109 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // Validate activation key - must exist and not be used
-      const key = await ActivationKey.findOne({
-        key: activationKey.toUpperCase(),
-        isUsed: false
-      }).session(dbSession);
+      let userKey = null;
+      let keyToUse = null;
 
-      if (!key) {
+      // Check if user already has an activation key assigned
+      if (user.activationKey) {
+        // User already has a key - use that one
+        userKey = await ActivationKey.findOne({
+          key: user.activationKey,
+          usedBy: userId
+        }).session(dbSession);
+
+        if (!userKey) {
+          await dbSession.abortTransaction();
+          return NextResponse.json(
+            { success: false, message: 'Your activation key was not found. Please contact support.' },
+            { status: 400 }
+          );
+        }
+
+        keyToUse = userKey;
+      } else {
+        // User doesn't have a key - they must provide one
+        if (!activationKey || activationKey.length < 6 || activationKey.length > 8) {
+          await dbSession.abortTransaction();
+          return NextResponse.json(
+            { success: false, message: 'Valid activation key is required for your first withdrawal' },
+            { status: 400 }
+          );
+        }
+
+        // Validate activation key - must exist and not be used
+        const newKey = await ActivationKey.findOne({
+          key: activationKey.toUpperCase(),
+          isUsed: false
+        }).session(dbSession);
+
+        if (!newKey) {
+          await dbSession.abortTransaction();
+          return NextResponse.json(
+            { success: false, message: 'Invalid or already used activation key' },
+            { status: 400 }
+          );
+        }
+
+        // Mark activation key as used by this user
+        await ActivationKey.findByIdAndUpdate(newKey._id, {
+          isUsed: true,
+          usedBy: userId,
+          usedAt: new Date()
+        }, { session: dbSession });
+
+        // Update user's activation key
+        await User.findByIdAndUpdate(userId, {
+          activationKey: activationKey.toUpperCase()
+        }, { session: dbSession });
+
+        keyToUse = newKey;
+      }
+
+      // Check if key is paused (withdrawal limit reached)
+      if (keyToUse.isPaused) {
         await dbSession.abortTransaction();
         return NextResponse.json(
-          { success: false, message: 'Invalid or already used activation key' },
+          { 
+            success: false, 
+            message: `Your key has reached the withdrawal limit of ₹${keyToUse.withdrawalLimit}. Please renew your key to continue withdrawing.`,
+            needsRenewal: true,
+            renewalPrice: keyToUse.price
+          },
           { status: 400 }
         );
       }
 
-      // Mark activation key as used by this user
-      await ActivationKey.findByIdAndUpdate(key._id, {
-        isUsed: true,
-        usedBy: userId,
-        usedAt: new Date()
-      }, { session: dbSession });
-
-      // Update user's activation key if they don't have one
-      if (!user.activationKey) {
-        await User.findByIdAndUpdate(userId, {
-          activationKey: activationKey.toUpperCase()
-        }, { session: dbSession });
+      // Check remaining withdrawal limit
+      const remainingLimit = keyToUse.withdrawalLimit - keyToUse.totalWithdrawn;
+      if (amount > remainingLimit) {
+        await dbSession.abortTransaction();
+        return NextResponse.json(
+          { 
+            success: false, 
+            message: `You can only withdraw ₹${remainingLimit} more with your current key. Total limit is ₹${keyToUse.withdrawalLimit}.`,
+            remainingLimit: remainingLimit,
+            needsRenewal: remainingLimit <= 0,
+            renewalPrice: keyToUse.price
+          },
+          { status: 400 }
+        );
       }
+
+      // Update the key's total withdrawn amount
+      const newTotalWithdrawn = keyToUse.totalWithdrawn + amount;
+      const shouldPause = newTotalWithdrawn >= keyToUse.withdrawalLimit;
+      
+      await ActivationKey.findByIdAndUpdate(keyToUse._id, {
+        totalWithdrawn: newTotalWithdrawn,
+        isPaused: shouldPause
+      }, { session: dbSession });
 
       // Create withdrawal request
       const withdrawalRequest = await WithdrawalRequest.create([{
         user: userId,
         amount,
-        activationKey: activationKey.toUpperCase(),
+        activationKey: keyToUse.key,
         status: 'pending',
         requestedAt: new Date(),
         paymentDetails
@@ -159,6 +266,8 @@ export async function POST(request: NextRequest) {
 
       await dbSession.commitTransaction();
 
+      const newRemainingLimit = keyToUse.withdrawalLimit - newTotalWithdrawn;
+      
       return NextResponse.json({
         success: true,
         message: 'Withdrawal request submitted successfully. Admin will review and process your request.',
@@ -166,7 +275,13 @@ export async function POST(request: NextRequest) {
           id: withdrawalRequest[0]._id,
           amount: withdrawalRequest[0].amount,
           status: withdrawalRequest[0].status,
-          requestedAt: withdrawalRequest[0].requestedAt
+          requestedAt: withdrawalRequest[0].requestedAt,
+          keyStatus: {
+            totalWithdrawn: newTotalWithdrawn,
+            remainingLimit: newRemainingLimit,
+            isPaused: shouldPause,
+            needsRenewal: shouldPause
+          }
         }
       });
 

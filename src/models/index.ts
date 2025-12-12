@@ -10,6 +10,7 @@ import './ActivationKey';
 import './MyStatusAd';
 import './MyStatusShare';
 import './WithdrawalRequest';
+import './KeyTier';
 
 export {};
 

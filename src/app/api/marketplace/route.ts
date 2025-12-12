@@ -5,7 +5,7 @@ import ActivationKey from '@/models/ActivationKey';
 import User from '@/models/User';
 import Transaction from '@/models/Transaction';
 import Commission from '@/models/Commission';
-import CommissionRate from '@/models/CommissionRate';
+import KeyTier from '@/models/KeyTier';
 import { authenticateRequest } from '@/middleware/auth';
 
 // Get user's purchased keys
@@ -198,9 +198,10 @@ export async function POST(request: NextRequest) {
         balanceAfter: buyer.walletBalance - key.price
       }], { session });
 
-      // Handle MLM commissions if referrer exists
-      if (referrer) {
-        await processMLMCommissions(buyer._id, referrer._id, key.price, session);
+      // Handle MLM commissions based on buyer's referral chain
+      // Use buyer's referredBy (their original referrer) for the commission chain
+      if (buyer.referredBy) {
+        await processMLMCommissions(buyer._id.toString(), buyer.referredBy.toString(), key.price, session);
       }
 
       await session.commitTransaction();
@@ -230,65 +231,86 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// Process MLM commissions
-async function processMLMCommissions(buyerId: string, referrerId: string, amount: number, session: any) {
-  const commissionRates = await CommissionRate.find({ isActive: true }).sort({ level: 1 });
+// Process MLM commissions using Key Tiers
+async function processMLMCommissions(buyerId: string, referrerId: string, keyPrice: number, session: any) {
+  try {
+    // Find the tier for this key price
+    const tier = await KeyTier.findOne({
+      minPrice: { $lte: keyPrice },
+      maxPrice: { $gte: keyPrice },
+      isActive: true
+    }).session(session);
 
-  // Build referral chain (up to 6 levels)
-  const referralChain = [];
-  let currentReferrerId = referrerId;
-
-  for (let level = 1; level <= 6 && currentReferrerId; level++) {
-    const referrer = await User.findById(currentReferrerId).session(session);
-    if (referrer) {
-      referralChain.push({
-        userId: referrer._id,
-        level: level
-      });
-      currentReferrerId = referrer.referredBy;
-    } else {
-      break;
+    if (!tier) {
+      console.log(`No tier found for key price: ₹${keyPrice}`);
+      return;
     }
-  }
 
-  // Process commissions for each level - key purchase bonuses disabled for simplified system
-  for (const chainItem of referralChain) {
-    const rate = commissionRates.find(r => r.level === chainItem.level);
-    if (rate && false) { // Disabled for simplified commission system
-      const commissionAmount = (amount * rate.keyPurchaseBonus) / 100;
+    console.log(`Using tier "${tier.name}" for key price ₹${keyPrice}`);
 
-      // Get current balance before updating
-      const currentUser = await User.findById(chainItem.userId).session(session);
-      const balanceBefore = currentUser!.walletBalance;
+    // Build referral chain (up to 6 levels)
+    const referralChain = [];
+    let currentReferrerId = referrerId;
 
-      // Create commission record
-      await Commission.create([{
-        user: chainItem.userId,
-        referredUser: buyerId,
-        commissionType: 'key_purchase',
-        level: chainItem.level,
-        amount: commissionAmount,
-        description: `Level ${chainItem.level} commission from key purchase`
-      }], { session });
-
-      // Credit to user's wallet
-      await User.findByIdAndUpdate(chainItem.userId, {
-        $inc: {
-          walletBalance: commissionAmount,
-          totalCommissionEarned: commissionAmount
-        }
-      }, { session });
-
-      // Create transaction record with correct balance values
-      await Transaction.create([{
-        user: chainItem.userId,
-        type: 'credit',
-        amount: commissionAmount,
-        reason: 'referral_bonus',
-        description: `Level ${chainItem.level} referral bonus`,
-        balanceBefore: balanceBefore,
-        balanceAfter: balanceBefore + commissionAmount
-      }], { session });
+    for (let level = 1; level <= 6 && currentReferrerId; level++) {
+      const referrer = await User.findById(currentReferrerId).session(session);
+      if (referrer) {
+        referralChain.push({
+          userId: referrer._id,
+          level: level
+        });
+        currentReferrerId = referrer.referredBy;
+      } else {
+        break;
+      }
     }
+
+    // Process commissions for each level using tier rates
+    for (const chainItem of referralChain) {
+      const levelKey = `level${chainItem.level}` as keyof typeof tier.commissions;
+      const commissionAmount = tier.commissions[levelKey] || 0;
+
+      if (commissionAmount > 0) {
+        // Get current balance before updating
+        const currentUser = await User.findById(chainItem.userId).session(session);
+        if (!currentUser) continue;
+        
+        const balanceBefore = currentUser.walletBalance;
+
+        // Create commission record
+        await Commission.create([{
+          user: chainItem.userId,
+          referredUser: buyerId,
+          commissionType: 'key_purchase',
+          level: chainItem.level,
+          amount: commissionAmount,
+          description: `Level ${chainItem.level} commission from key purchase (${tier.name} tier)`
+        }], { session });
+
+        // Credit to user's wallet
+        await User.findByIdAndUpdate(chainItem.userId, {
+          $inc: {
+            walletBalance: commissionAmount,
+            totalCommissionEarned: commissionAmount
+          }
+        }, { session });
+
+        // Create transaction record with correct balance values
+        await Transaction.create([{
+          user: chainItem.userId,
+          type: 'credit',
+          amount: commissionAmount,
+          reason: 'referral_bonus',
+          description: `Level ${chainItem.level} referral bonus from key purchase (${tier.name})`,
+          balanceBefore: balanceBefore,
+          balanceAfter: balanceBefore + commissionAmount
+        }], { session });
+
+        console.log(`Paid ₹${commissionAmount} to level ${chainItem.level} referrer`);
+      }
+    }
+  } catch (error) {
+    console.error('Error processing MLM commissions:', error);
+    // Don't throw - let the main transaction succeed even if commissions fail
   }
 }

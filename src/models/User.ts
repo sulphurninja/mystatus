@@ -10,6 +10,9 @@ export interface IUser extends Document {
   walletBalance: number;
   isActive: boolean;
   canShareAds: boolean;
+  // Onboarding - 8 day challenge
+  onboardingDaysCompleted: number; // 0-8, must share daily to progress
+  lastOnboardingShareDate?: Date; // Last date user shared a MyStatus ad
   // MLM Fields
   referredBy?: mongoose.Types.ObjectId;
   referralCode: string;
@@ -66,6 +69,16 @@ const UserSchema: Schema = new Schema({
     type: Boolean,
     default: false
   },
+  // Onboarding - 8 day challenge (must share MyStatus ad daily to progress)
+  onboardingDaysCompleted: {
+    type: Number,
+    default: 0,
+    min: 0,
+    max: 8
+  },
+  lastOnboardingShareDate: {
+    type: Date
+  },
   // MLM Fields
   referredBy: {
     type: mongoose.Schema.Types.ObjectId,
@@ -108,24 +121,55 @@ const UserSchema: Schema = new Schema({
 //   this.password = await bcrypt.hash(this.password, salt);
 // });
 
-// Check if user can share vendor ads (8 days after registration or manually activated)
+// Check if user can share vendor ads (completed 8-day challenge or manually activated)
 UserSchema.methods.canShareVendorAds = function(): boolean {
   // If manually activated by admin, allow immediately
   if (this.canShareAds) {
     return true;
   }
 
-  const eightDaysMs = 8 * 24 * 60 * 60 * 1000; // 8 days in milliseconds
-  const timeSinceRegistration = Date.now() - this.createdAt.getTime();
-  return timeSinceRegistration >= eightDaysMs;
+  // Must complete 8 days of sharing MyStatus ads
+  return this.onboardingDaysCompleted >= 8;
 };
 
 // Get days remaining until user can share vendor ads
 UserSchema.methods.getDaysUntilCanShare = function(): number {
-  const eightDaysMs = 8 * 24 * 60 * 60 * 1000; // 8 days in milliseconds
-  const timeSinceRegistration = Date.now() - this.createdAt.getTime();
-  const remainingMs = eightDaysMs - timeSinceRegistration;
-  return Math.max(0, Math.ceil(remainingMs / (24 * 60 * 60 * 1000)));
+  return Math.max(0, 8 - (this.onboardingDaysCompleted || 0));
+};
+
+// Check if user can progress to next onboarding day (hasn't shared today yet)
+UserSchema.methods.canProgressOnboarding = function(): boolean {
+  if (this.onboardingDaysCompleted >= 8) {
+    return false; // Already completed
+  }
+  
+  if (!this.lastOnboardingShareDate) {
+    return true; // Never shared, can progress
+  }
+  
+  // Check if last share was before today
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  
+  const lastShare = new Date(this.lastOnboardingShareDate);
+  lastShare.setHours(0, 0, 0, 0);
+  
+  return lastShare < today; // Can progress if last share was before today
+};
+
+// Check if user has shared today (for UI display)
+UserSchema.methods.hasSharedToday = function(): boolean {
+  if (!this.lastOnboardingShareDate) {
+    return false;
+  }
+  
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  
+  const lastShare = new Date(this.lastOnboardingShareDate);
+  lastShare.setHours(0, 0, 0, 0);
+  
+  return lastShare.getTime() === today.getTime();
 };
 
 // Compare password method

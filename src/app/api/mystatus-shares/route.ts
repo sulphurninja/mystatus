@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import connectToDatabase from '@/lib/mongodb';
 import MyStatusShare from '@/models/MyStatusShare';
 import MyStatusAd from '@/models/MyStatusAd';
+import User from '@/models/User';
 import { authenticateRequest } from '@/middleware/auth';
 
 export async function POST(request: NextRequest) {
@@ -35,6 +36,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Get user to check onboarding status
+    const user = await User.findById(auth.user!.id);
+    if (!user) {
+      return NextResponse.json(
+        { success: false, message: 'User not found' },
+        { status: 404 }
+      );
+    }
+
     // Create share record (MyStatus shares don't need verification)
     const share = await MyStatusShare.create({
       user: auth.user!.id,
@@ -47,9 +57,60 @@ export async function POST(request: NextRequest) {
       $inc: { totalShares: 1 }
     });
 
+    // Check if user can progress their 8-day onboarding challenge
+    let onboardingProgress = null;
+    if (user.onboardingDaysCompleted < 8) {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      
+      let canProgress = true;
+      if (user.lastOnboardingShareDate) {
+        const lastShare = new Date(user.lastOnboardingShareDate);
+        lastShare.setHours(0, 0, 0, 0);
+        canProgress = lastShare < today; // Only progress if last share was before today
+      }
+      
+      if (canProgress) {
+        // Progress to next day!
+        const newDaysCompleted = user.onboardingDaysCompleted + 1;
+        await User.findByIdAndUpdate(auth.user!.id, {
+          onboardingDaysCompleted: newDaysCompleted,
+          lastOnboardingShareDate: new Date()
+        });
+        
+        onboardingProgress = {
+          daysCompleted: newDaysCompleted,
+          daysRemaining: 8 - newDaysCompleted,
+          justCompletedDay: true,
+          canAccessPaidAds: newDaysCompleted >= 8
+        };
+        
+        console.log(`User ${user.name} completed onboarding day ${newDaysCompleted}/8`);
+      } else {
+        // Already shared today
+        onboardingProgress = {
+          daysCompleted: user.onboardingDaysCompleted,
+          daysRemaining: 8 - user.onboardingDaysCompleted,
+          justCompletedDay: false,
+          alreadySharedToday: true,
+          canAccessPaidAds: false
+        };
+      }
+    } else {
+      // Already completed onboarding
+      onboardingProgress = {
+        daysCompleted: 8,
+        daysRemaining: 0,
+        justCompletedDay: false,
+        canAccessPaidAds: true
+      };
+    }
+
     return NextResponse.json({
       success: true,
-      message: 'MyStatus ad shared successfully',
+      message: onboardingProgress?.justCompletedDay 
+        ? `Day ${onboardingProgress.daysCompleted} completed! ${onboardingProgress.daysRemaining} days remaining.`
+        : 'MyStatus ad shared successfully',
       data: {
         id: share._id,
         mystatusAd: {
@@ -57,7 +118,8 @@ export async function POST(request: NextRequest) {
           title: mystatusAd.title
         },
         sharedAt: share.sharedAt,
-        status: share.status
+        status: share.status,
+        onboardingProgress
       }
     });
 

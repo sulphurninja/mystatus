@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import connectToDatabase from '@/lib/mongodb';
 import WithdrawalRequest from '@/models/WithdrawalRequest';
 import User from '@/models/User';
-import { verifyToken } from '@/middleware/auth';
+import { verifyToken, getTokenFromRequest } from '@/middleware/auth';
 
 // GET - Get all withdrawal requests (admin)
 export async function GET(request: NextRequest) {
@@ -10,7 +10,15 @@ export async function GET(request: NextRequest) {
     await connectToDatabase();
 
     // Verify admin token
-    const decoded = await verifyToken(request);
+    const token = getTokenFromRequest(request);
+    if (!token) {
+      return NextResponse.json(
+        { success: false, message: 'Unauthorized - No token provided' },
+        { status: 401 }
+      );
+    }
+
+    const decoded = verifyToken(token);
     if (!decoded || decoded.type !== 'admin') {
       return NextResponse.json(
         { success: false, message: 'Unauthorized - Admin access required' },

@@ -64,9 +64,9 @@ const navigation = [
     current: false
   },
   {
-    name: 'Commission Rates',
-    href: '/admin/commission-rates',
-    icon: 'TrendingUp',
+    name: 'Key Tiers',
+    href: '/admin/key-tiers',
+    icon: 'Layers',
     current: false
   },
   {

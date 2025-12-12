@@ -12,6 +12,12 @@ export interface IActivationKey extends Document {
   soldAt?: Date;
   purchasedBy?: mongoose.Types.ObjectId;
   purchasedAt?: Date;
+  // Withdrawal tracking fields
+  totalWithdrawn: number;
+  withdrawalLimit: number;
+  isPaused: boolean;
+  renewalCount: number;
+  lastRenewedAt?: Date;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -63,6 +69,27 @@ const ActivationKeySchema: Schema = new Schema({
     ref: 'User'
   },
   purchasedAt: {
+    type: Date
+  },
+  // Withdrawal tracking fields
+  totalWithdrawn: {
+    type: Number,
+    default: 0,
+    min: 0
+  },
+  withdrawalLimit: {
+    type: Number,
+    default: 25000 // ₹25,000 withdrawal cap per key
+  },
+  isPaused: {
+    type: Boolean,
+    default: false
+  },
+  renewalCount: {
+    type: Number,
+    default: 0
+  },
+  lastRenewedAt: {
     type: Date
   }
 }, {
