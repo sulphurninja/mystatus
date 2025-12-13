@@ -1,9 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import connectToDatabase from '@/lib/mongodb';
 import User from '@/models/User';
-import Commission from '@/models/Commission';
-import CommissionRate from '@/models/CommissionRate';
-import Transaction from '@/models/Transaction';
 import { generateToken } from '@/middleware/auth';
 import mongoose from 'mongoose';
 
@@ -11,7 +8,10 @@ export async function POST(request: NextRequest) {
   try {
     await connectToDatabase();
 
-    const { name, email, phone, profileImage, referralCode } = await request.json();
+    const body = await request.json();
+    const { name, email, phone, profileImage, referralCode } = body;
+    
+    console.log('📝 Registration attempt:', { name, email, phone, referralCode });
 
     // Validate required fields
     if (!name) {
@@ -30,11 +30,16 @@ export async function POST(request: NextRequest) {
     }
 
     // Find referrer - referral code is required
-    const referrer = await User.findOne({ referralCode: referralCode.toUpperCase() });
+    const searchCode = referralCode.toUpperCase();
+    console.log('🔍 Searching for referrer with code:', searchCode);
+    
+    const referrer = await User.findOne({ referralCode: searchCode });
+    console.log('👤 Referrer found:', referrer ? { id: referrer._id, name: referrer.name, code: referrer.referralCode } : 'NOT FOUND');
 
     if (!referrer) {
+      console.log('❌ Invalid referral code:', searchCode);
       return NextResponse.json(
-        { success: false, message: 'Invalid referral code. Please check and try again.' },
+        { success: false, message: `Invalid referral code "${searchCode}". Please check and try again.` },
         { status: 400 }
       );
     }
@@ -65,18 +70,14 @@ export async function POST(request: NextRequest) {
         referralLevel: 1
       }], { session: dbSession });
 
-      // Process referral commission if referrer exists
+      // Update referrer's stats if referrer exists (NO commissions on registration - commissions are paid on key activation)
       if (referrer) {
-        // Update referrer's stats
         await User.findByIdAndUpdate(referrer._id, {
           $inc: {
             totalReferrals: 1,
             activeReferrals: 1
           }
         }, { session: dbSession });
-
-        // Process MLM commissions for registration
-        await processRegistrationCommissions(user[0]._id, referrer._id, dbSession);
       }
 
       // Commit transaction
@@ -84,6 +85,8 @@ export async function POST(request: NextRequest) {
 
       // Generate proper token with user ID
       const finalToken = generateToken(user[0]._id.toString(), 'user');
+
+      console.log('✅ User registered successfully:', { id: user[0]._id, name: user[0].name, referralCode: user[0].referralCode });
 
       return NextResponse.json({
         success: true,
@@ -115,12 +118,15 @@ export async function POST(request: NextRequest) {
     }
 
   } catch (error: any) {
-    console.error('User registration error:', error);
+    console.error('❌ User registration error:', error);
+    console.error('Error details:', { code: error.code, message: error.message, stack: error.stack });
 
     // Handle duplicate key errors
     if (error.code === 11000) {
+      const field = Object.keys(error.keyPattern || {})[0] || 'field';
+      console.log('Duplicate key error on field:', field);
       return NextResponse.json(
-        { success: false, message: 'User with this email or phone already exists' },
+        { success: false, message: `User with this ${field} already exists` },
         { status: 400 }
       );
     }
@@ -132,72 +138,3 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// Process cascading commissions for registration
-async function processRegistrationCommissions(newUserId: string, directReferrerId: string, session: any) {
-  const commissionRates = await CommissionRate.find({ isActive: true }).sort({ level: 1 });
-
-  // Build referral chain (up to 6 levels)
-  const referralChain = [];
-  let currentReferrerId = directReferrerId;
-
-  for (let level = 1; level <= 6 && currentReferrerId; level++) {
-    const referrer = await User.findById(currentReferrerId).session(session);
-    if (referrer) {
-      referralChain.push({
-        userId: referrer._id,
-        level: level
-      });
-      currentReferrerId = referrer.referredBy;
-    } else {
-      break;
-    }
-  }
-
-  // Process commissions for each level
-  for (const chainItem of referralChain) {
-    const rate = commissionRates.find(r => r.level === chainItem.level);
-    if (rate && rate.referralBonus > 0) {
-      // Each level gets its fixed referral bonus amount
-      const commissionAmount = rate.referralBonus;
-
-      if (commissionAmount > 0) {
-        // Get current balance before updating
-        const currentUser = await User.findById(chainItem.userId).session(session);
-        const balanceBefore = currentUser!.walletBalance;
-
-        // Create commission record
-        await Commission.create([{
-          user: chainItem.userId,
-          referredUser: newUserId,
-          commissionType: 'referral',
-          level: chainItem.level,
-          amount: commissionAmount,
-          description: chainItem.level === 1
-            ? 'Direct referral bonus'
-            : `Level ${chainItem.level} network referral bonus`
-        }], { session });
-
-        // Credit to user's wallet
-        await User.findByIdAndUpdate(chainItem.userId, {
-          $inc: {
-            walletBalance: commissionAmount,
-            totalCommissionEarned: commissionAmount
-          }
-        }, { session });
-
-        // Create transaction record with correct balance values
-        await Transaction.create([{
-          user: chainItem.userId,
-          type: 'credit',
-          amount: commissionAmount,
-          reason: 'referral_bonus',
-          description: chainItem.level === 1
-            ? 'Direct referral bonus'
-            : `Level ${chainItem.level} referral bonus`,
-          balanceBefore: balanceBefore,
-          balanceAfter: balanceBefore + commissionAmount
-        }], { session });
-      }
-    }
-  }
-}

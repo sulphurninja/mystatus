@@ -1,6 +1,6 @@
 import mongoose, { Document, Schema } from 'mongoose';
 
-export type CommissionType = 'referral' | 'level_bonus' | 'key_purchase';
+export type CommissionType = 'referral' | 'level_bonus' | 'key_purchase' | 'key_activation' | 'key_renewal';
 
 export interface ICommission extends Document {
   user: mongoose.Types.ObjectId;
@@ -27,7 +27,7 @@ const CommissionSchema: Schema = new Schema({
   },
   commissionType: {
     type: String,
-    enum: ['referral', 'level_bonus', 'key_purchase'],
+    enum: ['referral', 'level_bonus', 'key_purchase', 'key_activation', 'key_renewal'],
     required: true
   },
   level: {

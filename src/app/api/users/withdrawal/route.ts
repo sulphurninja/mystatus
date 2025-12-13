@@ -4,6 +4,8 @@ import User from '@/models/User';
 import ActivationKey from '@/models/ActivationKey';
 import WithdrawalRequest from '@/models/WithdrawalRequest';
 import Transaction from '@/models/Transaction';
+import Commission from '@/models/Commission';
+import KeyTier from '@/models/KeyTier';
 import { verifyToken, getTokenFromRequest } from '@/middleware/auth';
 import mongoose from 'mongoose';
 
@@ -212,6 +214,11 @@ export async function POST(request: NextRequest) {
           activationKey: activationKey.toUpperCase()
         }, { session: dbSession });
 
+        // Process MLM commissions for key activation (commissions are paid when key is first used, not on registration)
+        if (user.referredBy) {
+          await processKeyActivationCommissions(userId, user.referredBy.toString(), newKey.price, dbSession);
+        }
+
         keyToUse = newKey;
       }
 
@@ -302,6 +309,90 @@ export async function POST(request: NextRequest) {
       { success: false, message: 'Server error', error: error.message },
       { status: 500 }
     );
+  }
+}
+
+// Process MLM commissions when a key is activated (first time use)
+async function processKeyActivationCommissions(userId: string, referrerId: string, keyPrice: number, session: any) {
+  try {
+    // Find the tier for this key price
+    const tier = await KeyTier.findOne({
+      minPrice: { $lte: keyPrice },
+      maxPrice: { $gte: keyPrice },
+      isActive: true
+    }).session(session);
+
+    if (!tier) {
+      console.log(`No tier found for key price: ₹${keyPrice}`);
+      return;
+    }
+
+    console.log(`Processing key activation commissions using tier "${tier.name}" for key price ₹${keyPrice}`);
+
+    // Build referral chain (up to 6 levels)
+    const referralChain = [];
+    let currentReferrerId = referrerId;
+
+    for (let level = 1; level <= 6 && currentReferrerId; level++) {
+      const referrer = await User.findById(currentReferrerId).session(session);
+      if (referrer) {
+        referralChain.push({
+          userId: referrer._id,
+          level: level
+        });
+        currentReferrerId = referrer.referredBy?.toString();
+      } else {
+        break;
+      }
+    }
+
+    // Process commissions for each level using tier rates
+    for (const chainItem of referralChain) {
+      const levelKey = `level${chainItem.level}` as keyof typeof tier.commissions;
+      const commissionAmount = tier.commissions[levelKey] || 0;
+
+      if (commissionAmount > 0) {
+        // Get current balance before updating
+        const currentUser = await User.findById(chainItem.userId).session(session);
+        if (!currentUser) continue;
+        
+        const balanceBefore = currentUser.walletBalance;
+
+        // Create commission record
+        await Commission.create([{
+          user: chainItem.userId,
+          referredUser: userId,
+          commissionType: 'key_activation',
+          level: chainItem.level,
+          amount: commissionAmount,
+          description: `Level ${chainItem.level} commission from key activation (${tier.name} tier)`
+        }], { session });
+
+        // Credit to user's wallet
+        await User.findByIdAndUpdate(chainItem.userId, {
+          $inc: {
+            walletBalance: commissionAmount,
+            totalCommissionEarned: commissionAmount
+          }
+        }, { session });
+
+        // Create transaction record
+        await Transaction.create([{
+          user: chainItem.userId,
+          type: 'credit',
+          amount: commissionAmount,
+          reason: 'referral_bonus',
+          description: `Level ${chainItem.level} referral bonus from key activation (${tier.name})`,
+          balanceBefore: balanceBefore,
+          balanceAfter: balanceBefore + commissionAmount
+        }], { session });
+
+        console.log(`Paid ₹${commissionAmount} to level ${chainItem.level} referrer for key activation`);
+      }
+    }
+  } catch (error) {
+    console.error('Error processing key activation commissions:', error);
+    // Don't throw - let the main transaction succeed even if commissions fail
   }
 }
 
