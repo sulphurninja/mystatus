@@ -248,63 +248,63 @@ async function processMLMCommissions(buyerId: string, referrerId: string, keyPri
 
     console.log(`Using tier "${tier.name}" for key price ₹${keyPrice}`);
 
-    // Build referral chain (up to 6 levels)
-    const referralChain = [];
-    let currentReferrerId = referrerId;
+  // Build referral chain (up to 6 levels)
+  const referralChain = [];
+  let currentReferrerId = referrerId;
 
-    for (let level = 1; level <= 6 && currentReferrerId; level++) {
-      const referrer = await User.findById(currentReferrerId).session(session);
-      if (referrer) {
-        referralChain.push({
-          userId: referrer._id,
-          level: level
-        });
-        currentReferrerId = referrer.referredBy;
-      } else {
-        break;
-      }
+  for (let level = 1; level <= 6 && currentReferrerId; level++) {
+    const referrer = await User.findById(currentReferrerId).session(session);
+    if (referrer) {
+      referralChain.push({
+        userId: referrer._id,
+        level: level
+      });
+      currentReferrerId = referrer.referredBy;
+    } else {
+      break;
     }
+  }
 
     // Process commissions for each level using tier rates
-    for (const chainItem of referralChain) {
+  for (const chainItem of referralChain) {
       const levelKey = `level${chainItem.level}` as keyof typeof tier.commissions;
       const commissionAmount = tier.commissions[levelKey] || 0;
 
       if (commissionAmount > 0) {
-        // Get current balance before updating
-        const currentUser = await User.findById(chainItem.userId).session(session);
+      // Get current balance before updating
+      const currentUser = await User.findById(chainItem.userId).session(session);
         if (!currentUser) continue;
         
         const balanceBefore = currentUser.walletBalance;
 
-        // Create commission record
-        await Commission.create([{
-          user: chainItem.userId,
-          referredUser: buyerId,
-          commissionType: 'key_purchase',
-          level: chainItem.level,
-          amount: commissionAmount,
+      // Create commission record
+      await Commission.create([{
+        user: chainItem.userId,
+        referredUser: buyerId,
+        commissionType: 'key_purchase',
+        level: chainItem.level,
+        amount: commissionAmount,
           description: `Level ${chainItem.level} commission from key purchase (${tier.name} tier)`
-        }], { session });
+      }], { session });
 
-        // Credit to user's wallet
-        await User.findByIdAndUpdate(chainItem.userId, {
-          $inc: {
-            walletBalance: commissionAmount,
-            totalCommissionEarned: commissionAmount
-          }
-        }, { session });
+      // Credit to user's wallet
+      await User.findByIdAndUpdate(chainItem.userId, {
+        $inc: {
+          walletBalance: commissionAmount,
+          totalCommissionEarned: commissionAmount
+        }
+      }, { session });
 
-        // Create transaction record with correct balance values
-        await Transaction.create([{
-          user: chainItem.userId,
-          type: 'credit',
-          amount: commissionAmount,
-          reason: 'referral_bonus',
+      // Create transaction record with correct balance values
+      await Transaction.create([{
+        user: chainItem.userId,
+        type: 'credit',
+        amount: commissionAmount,
+        reason: 'referral_bonus',
           description: `Level ${chainItem.level} referral bonus from key purchase (${tier.name})`,
-          balanceBefore: balanceBefore,
-          balanceAfter: balanceBefore + commissionAmount
-        }], { session });
+        balanceBefore: balanceBefore,
+        balanceAfter: balanceBefore + commissionAmount
+      }], { session });
 
         console.log(`Paid ₹${commissionAmount} to level ${chainItem.level} referrer`);
       }

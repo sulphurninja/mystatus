@@ -1,7 +1,7 @@
 import mongoose, { Document, Schema } from 'mongoose';
 
 export type TransactionType = 'credit' | 'debit';
-export type TransactionReason = 'reward_earned' | 'advertisement_cost' | 'withdrawal' | 'bonus' | 'admin_credit' | 'commission' | 'key_purchase' | 'referral_bonus' | 'key_renewal' | 'key_renewal_income';
+export type TransactionReason = 'reward_earned' | 'advertisement_cost' | 'withdrawal' | 'bonus' | 'admin_credit' | 'commission' | 'key_purchase' | 'referral_bonus' | 'key_renewal' | 'key_renewal_income' | 'key_activation';
 
 export interface ITransaction extends Document {
   user?: mongoose.Types.ObjectId;
@@ -39,7 +39,7 @@ const TransactionSchema: Schema = new Schema({
   },
   reason: {
     type: String,
-    enum: ['reward_earned', 'advertisement_cost', 'withdrawal', 'bonus', 'admin_credit', 'commission', 'key_purchase', 'referral_bonus', 'key_renewal', 'key_renewal_income'],
+    enum: ['reward_earned', 'advertisement_cost', 'withdrawal', 'bonus', 'admin_credit', 'commission', 'key_purchase', 'referral_bonus', 'key_renewal', 'key_renewal_income', 'key_activation'],
     required: true
   },
   description: {

@@ -47,6 +47,12 @@ interface ReferralInfo {
   };
 }
 
+interface AvailableKey {
+  _id: string;
+  key: string;
+  price: number;
+}
+
 interface Transaction {
   id: string;
   type: 'credit' | 'debit';
@@ -74,6 +80,11 @@ export default function UserDetailsPage() {
   const [transactionsLoading, setTransactionsLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'overview' | 'network' | 'transactions'>('overview');
+  const [showAssignKeyModal, setShowAssignKeyModal] = useState(false);
+  const [availableKeys, setAvailableKeys] = useState<AvailableKey[]>([]);
+  const [selectedKeyId, setSelectedKeyId] = useState<string>('');
+  const [assigningKey, setAssigningKey] = useState(false);
+  const [keysLoading, setKeysLoading] = useState(false);
 
   const getAuthHeaders = () => {
     const token = typeof window !== 'undefined' ? localStorage.getItem('adminToken') : null;
@@ -177,6 +188,73 @@ export default function UserDetailsPage() {
     setActiveTab(tab);
     if (tab === 'transactions' && transactions.length === 0) {
       loadTransactions();
+    }
+  };
+
+  const loadAvailableKeys = async () => {
+    if (!user || user.activationKey) return;
+
+    try {
+      setKeysLoading(true);
+      const response = await fetch('/api/admin/available-keys', {
+        headers: getAuthHeaders(),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setAvailableKeys(data.keys || []);
+      }
+    } catch (error) {
+      console.error('Error loading available keys:', error);
+    } finally {
+      setKeysLoading(false);
+    }
+  };
+
+  const handleOpenAssignKeyModal = () => {
+    if (!user || user.activationKey) {
+      alert('User already has an activation key');
+      return;
+    }
+    setShowAssignKeyModal(true);
+    loadAvailableKeys();
+  };
+
+  const handleAssignKey = async () => {
+    if (!user || !selectedKeyId) {
+      alert('Please select a key to assign');
+      return;
+    }
+
+    try {
+      setAssigningKey(true);
+      const response = await fetch('/api/admin/assign-key', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...getAuthHeaders(),
+        },
+        body: JSON.stringify({
+          userId: user._id,
+          keyId: selectedKeyId
+        })
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        alert('Key assigned successfully!');
+        setUser(prev => prev ? { ...prev, activationKey: data.data.key } : null);
+        setShowAssignKeyModal(false);
+        setSelectedKeyId('');
+      } else {
+        alert(data.message || 'Failed to assign key');
+      }
+    } catch (error) {
+      console.error('Error assigning key:', error);
+      alert('Error assigning key');
+    } finally {
+      setAssigningKey(false);
     }
   };
 
@@ -343,6 +421,14 @@ export default function UserDetailsPage() {
             >
               {user.canShareAds ? 'Disable Ad Sharing' : 'Enable Ad Sharing'}
             </button>
+            {!user.activationKey && (
+              <button
+                onClick={handleOpenAssignKeyModal}
+                className="px-4 py-2 bg-purple-500/20 text-purple-400 hover:bg-purple-500/30 rounded-xl text-sm font-medium transition-all duration-200 border border-purple-500/30"
+              >
+                Assign Key
+              </button>
+            )}
             <button className="px-4 py-2 bg-slate-700/50 text-slate-300 hover:bg-slate-600/50 rounded-xl text-sm font-medium transition-all duration-200 border border-slate-600/50">
               Edit User
             </button>
@@ -612,6 +698,71 @@ export default function UserDetailsPage() {
                     </div>
                   </div>
                 ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Assign Key Modal */}
+      {showAssignKeyModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-slate-800 rounded-2xl p-6 w-full max-w-md border border-slate-700/50">
+            <h3 className="text-xl font-bold text-slate-100 mb-4">Assign Activation Key</h3>
+
+            {keysLoading ? (
+              <div className="space-y-3">
+                {[...Array(3)].map((_, i) => (
+                  <div key={i} className="h-12 bg-slate-700/30 rounded-xl animate-pulse" />
+                ))}
+              </div>
+            ) : availableKeys.length === 0 ? (
+              <div className="text-center py-8">
+                <p className="text-slate-400 mb-4">No available keys found</p>
+                <p className="text-slate-500 text-sm">You need to create or have available keys first</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-slate-300 text-sm font-medium mb-2">Select Key</label>
+                  <select
+                    value={selectedKeyId}
+                    onChange={(e) => setSelectedKeyId(e.target.value)}
+                    className="w-full bg-slate-700/50 border border-slate-600 rounded-xl px-4 py-3 text-slate-100 text-sm focus:outline-none focus:border-emerald-500"
+                  >
+                    <option value="">-- Choose a key --</option>
+                    {availableKeys.map((key) => (
+                      <option key={key._id} value={key._id}>
+                        {key.key} - ₹{key.price}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="bg-slate-700/20 rounded-xl p-3 border border-slate-700/50">
+                  <p className="text-slate-400 text-xs">
+                    <strong>Note:</strong> The user's referral chain will receive commissions as if they purchased this key themselves.
+                  </p>
+                </div>
+
+                <div className="flex space-x-3">
+                  <button
+                    onClick={() => {
+                      setShowAssignKeyModal(false);
+                      setSelectedKeyId('');
+                    }}
+                    className="flex-1 px-4 py-2 bg-slate-700/50 text-slate-300 hover:bg-slate-600/50 rounded-xl font-medium transition-all duration-200 border border-slate-600/50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleAssignKey}
+                    disabled={!selectedKeyId || assigningKey}
+                    className="flex-1 px-4 py-2 bg-purple-500/20 text-purple-400 hover:bg-purple-500/30 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl font-medium transition-all duration-200 border border-purple-500/30"
+                  >
+                    {assigningKey ? 'Assigning...' : 'Assign Key'}
+                  </button>
+                </div>
               </div>
             )}
           </div>
