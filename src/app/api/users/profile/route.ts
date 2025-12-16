@@ -24,20 +24,6 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Calculate onboarding progress
-    const onboardingDaysCompleted = user.onboardingDaysCompleted || 0;
-    const canAccessPaidAds = user.canShareAds || onboardingDaysCompleted >= 8;
-    
-    // Check if user has shared today
-    let hasSharedToday = false;
-    if (user.lastOnboardingShareDate) {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const lastShare = new Date(user.lastOnboardingShareDate);
-      lastShare.setHours(0, 0, 0, 0);
-      hasSharedToday = lastShare.getTime() === today.getTime();
-    }
-
     return NextResponse.json({
       success: true,
       data: {
@@ -51,15 +37,7 @@ export async function GET(request: NextRequest) {
         walletBalance: user.walletBalance,
         isActive: user.isActive,
         canShareAds: user.canShareAds,
-        createdAt: user.createdAt,
-        // Onboarding progress
-        onboarding: {
-          daysCompleted: onboardingDaysCompleted,
-          daysRemaining: Math.max(0, 8 - onboardingDaysCompleted),
-          hasSharedToday: hasSharedToday,
-          canAccessPaidAds: canAccessPaidAds,
-          lastShareDate: user.lastOnboardingShareDate
-        }
+        createdAt: user.createdAt
       }
     });
 

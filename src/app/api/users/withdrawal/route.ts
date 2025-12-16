@@ -158,69 +158,30 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      let userKey = null;
-      let keyToUse = null;
-
-      // Check if user already has an activation key assigned
-      if (user.activationKey) {
-        // User already has a key - use that one
-        userKey = await ActivationKey.findOne({
-          key: user.activationKey,
-          usedBy: userId
-        }).session(dbSession);
-
-        if (!userKey) {
-          await dbSession.abortTransaction();
-          return NextResponse.json(
-            { success: false, message: 'Your activation key was not found. Please contact support.' },
-            { status: 400 }
-          );
-        }
-
-        keyToUse = userKey;
-      } else {
-        // User doesn't have a key - they must provide one
-        if (!activationKey || activationKey.length < 6 || activationKey.length > 8) {
-          await dbSession.abortTransaction();
-          return NextResponse.json(
-            { success: false, message: 'Valid activation key is required for your first withdrawal' },
-            { status: 400 }
-          );
-        }
-
-        // Validate activation key - must exist and not be used
-        const newKey = await ActivationKey.findOne({
-          key: activationKey.toUpperCase(),
-          isUsed: false
-        }).session(dbSession);
-
-        if (!newKey) {
-          await dbSession.abortTransaction();
-          return NextResponse.json(
-            { success: false, message: 'Invalid or already used activation key' },
-            { status: 400 }
-          );
-        }
-
-        // Mark activation key as used by this user
-        await ActivationKey.findByIdAndUpdate(newKey._id, {
-          isUsed: true,
-          usedBy: userId,
-          usedAt: new Date()
-        }, { session: dbSession });
-
-        // Update user's activation key
-        await User.findByIdAndUpdate(userId, {
-          activationKey: activationKey.toUpperCase()
-        }, { session: dbSession });
-
-        // Process MLM commissions for key activation (commissions are paid when key is first used, not on registration)
-        if (user.referredBy) {
-          await processKeyActivationCommissions(userId, user.referredBy.toString(), newKey.price, dbSession);
-        }
-
-        keyToUse = newKey;
+      // User must have an activation key to withdraw
+      if (!user.activationKey) {
+        await dbSession.abortTransaction();
+        return NextResponse.json(
+          { success: false, message: 'You need an activation key to withdraw. Please purchase one from the marketplace.' },
+          { status: 400 }
+        );
       }
+
+      // Get user's assigned key
+      const userKey = await ActivationKey.findOne({
+        key: user.activationKey,
+        usedBy: userId
+      }).session(dbSession);
+
+      if (!userKey) {
+        await dbSession.abortTransaction();
+        return NextResponse.json(
+          { success: false, message: 'Your activation key was not found. Please contact support.' },
+          { status: 400 }
+        );
+      }
+
+      const keyToUse = userKey;
 
       // Check if key is paused (withdrawal limit reached)
       if (keyToUse.isPaused) {

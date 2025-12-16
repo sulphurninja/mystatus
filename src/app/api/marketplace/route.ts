@@ -178,14 +178,26 @@ export async function POST(request: NextRequest) {
         }, { session });
       }
 
-      // Update key as sold
-      await ActivationKey.findByIdAndUpdate(key._id, {
+      // Check if buyer already has a key
+      const buyerHasKey = buyer.activationKey;
+
+      // Update key as sold and potentially assign to buyer
+      const keyUpdate: any = {
         soldBy: key.createdBy,
         soldAt: new Date(),
         purchasedBy: buyer._id,
         purchasedAt: new Date(),
         isForSale: false
-      }, { session });
+      };
+
+      // Auto-assign key if buyer doesn't have one yet (first purchase)
+      if (!buyerHasKey) {
+        keyUpdate.isUsed = true;
+        keyUpdate.usedBy = buyer._id;
+        keyUpdate.usedAt = new Date();
+      }
+
+      await ActivationKey.findByIdAndUpdate(key._id, keyUpdate, { session });
 
       // Create transaction record
       await Transaction.create([{
@@ -193,10 +205,17 @@ export async function POST(request: NextRequest) {
         type: 'debit',
         amount: key.price,
         reason: 'key_purchase',
-        description: `Purchased activation key: ${key.key}`,
+        description: `Purchased activation key: ${key.key}${!buyerHasKey ? ' (Auto-assigned)' : ''}`,
         balanceBefore: buyer.walletBalance,
         balanceAfter: buyer.walletBalance - key.price
       }], { session });
+
+      // If key was auto-assigned (first purchase), update user's activationKey field
+      if (!buyerHasKey) {
+        await User.findByIdAndUpdate(buyer._id, {
+          activationKey: key.key
+        }, { session });
+      }
 
       // Handle MLM commissions based on buyer's referral chain
       // Use buyer's referredBy (their original referrer) for the commission chain

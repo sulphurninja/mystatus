@@ -62,24 +62,6 @@ export default function UsersPage() {
     ));
   };
 
-  const toggleUserAdsPermission = async (userId: string) => {
-    try {
-      const response = await fetch(`/api/admin/users/${userId}/ads-permission`, {
-        method: 'PUT',
-        headers: getAuthHeaders(),
-      });
-
-      if (response.ok) {
-        setUsers(prev => prev.map(user =>
-          user._id === userId
-            ? { ...user, canShareAds: !user.canShareAds }
-            : user
-        ));
-      }
-    } catch (error) {
-      console.error('Error toggling user ads permission:', error);
-    }
-  };
 
   const filteredUsers = users.filter(user =>
     user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -273,7 +255,6 @@ export default function UsersPage() {
                   <th className="px-6 py-4 font-semibold">Activation Key</th>
                   <th className="px-6 py-4 font-semibold">Balance</th>
                   <th className="px-6 py-4 font-semibold">Status</th>
-                  <th className="px-6 py-4 font-semibold">Ad Sharing</th>
                   <th className="px-6 py-4 font-semibold">Joined</th>
                   <th className="px-6 py-4 font-semibold">Actions</th>
                 </tr>
@@ -317,15 +298,6 @@ export default function UsersPage() {
                         {user.isActive ? 'Active' : 'Inactive'}
                       </span>
                     </td>
-                    <td className="px-6 py-4">
-                      <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                        user.canShareAds
-                          ? 'bg-green-500/20 text-green-300 border border-green-500/30'
-                          : 'bg-yellow-500/20 text-yellow-300 border border-yellow-500/30'
-                      }`}>
-                        {user.canShareAds ? 'Enabled' : 'Waiting'}
-                      </span>
-                    </td>
                     <td className="px-6 py-4 text-slate-300">
                       {new Date(user.createdAt).toLocaleDateString()}
                     </td>
@@ -340,16 +312,6 @@ export default function UsersPage() {
                           }`}
                         >
                           {user.isActive ? 'Deactivate' : 'Activate'}
-                        </button>
-                        <button
-                          onClick={() => toggleUserAdsPermission(user._id)}
-                          className={`px-3 py-1 rounded-lg text-xs font-medium transition-all duration-200 ${
-                            user.canShareAds
-                              ? 'bg-yellow-500/20 text-yellow-400 hover:bg-yellow-500/30 border border-yellow-500/30'
-                              : 'bg-green-500/20 text-green-400 hover:bg-green-500/30 border border-green-500/30'
-                          }`}
-                        >
-                          {user.canShareAds ? 'Disable Ads' : 'Enable Ads'}
                         </button>
                         <Link href={`/admin/users/${user._id}`}>
                           <button className="px-3 py-1 bg-slate-700/50 text-slate-300 hover:bg-slate-600/50 rounded-lg text-xs font-medium transition-all duration-200 border border-slate-600/50">

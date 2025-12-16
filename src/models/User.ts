@@ -5,14 +5,11 @@ export interface IUser extends Document {
   name: string;
   email?: string;
   phone?: string;
-  activationKey?: string; // Now optional - added during withdrawal
+  activationKey?: string;
   profileImage?: string;
   walletBalance: number;
   isActive: boolean;
   canShareAds: boolean;
-  // Onboarding - 8 day challenge
-  onboardingDaysCompleted: number; // 0-8, must share daily to progress
-  lastOnboardingShareDate?: Date; // Last date user shared a MyStatus ad
   // MLM Fields
   referredBy?: mongoose.Types.ObjectId;
   referralCode: string;
@@ -68,16 +65,6 @@ const UserSchema: Schema = new Schema({
   canShareAds: {
     type: Boolean,
     default: false
-  },
-  // Onboarding - 8 day challenge (must share MyStatus ad daily to progress)
-  onboardingDaysCompleted: {
-    type: Number,
-    default: 0,
-    min: 0,
-    max: 8
-  },
-  lastOnboardingShareDate: {
-    type: Date
   },
   // MLM Fields
   referredBy: {

@@ -144,25 +144,6 @@ export default function UserDetailsPage() {
     }
   };
 
-  const toggleUserAdsPermission = async () => {
-    if (!user) return;
-
-    try {
-      const response = await fetch(`/api/admin/users/${user._id}/ads-permission`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          ...getAuthHeaders(),
-        },
-      });
-
-      if (response.ok) {
-        setUser(prev => prev ? { ...prev, canShareAds: !prev.canShareAds } : null);
-      }
-    } catch (error) {
-      console.error('Error toggling user ads permission:', error);
-    }
-  };
 
   const loadTransactions = async () => {
     if (!user) return;
@@ -342,13 +323,6 @@ export default function UserDetailsPage() {
                 }`}>
                   {user.isActive ? 'Active' : 'Inactive'}
                 </div>
-                <div className={`px-3 py-1 rounded-full text-sm font-semibold ${
-                  user.canShareAds
-                    ? 'bg-green-500/20 text-green-400 border border-green-500/30'
-                    : 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30'
-                }`}>
-                  Ads: {user.canShareAds ? 'Enabled' : 'Waiting'}
-                </div>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                 {user.email && (
@@ -410,16 +384,6 @@ export default function UserDetailsPage() {
               }`}
             >
               {user.isActive ? 'Deactivate' : 'Activate'}
-            </button>
-            <button
-              onClick={toggleUserAdsPermission}
-              className={`px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200 ${
-                user.canShareAds
-                  ? 'bg-yellow-500/20 text-yellow-400 hover:bg-yellow-500/30 border border-yellow-500/30'
-                  : 'bg-green-500/20 text-green-400 hover:bg-green-500/30 border border-green-500/30'
-              }`}
-            >
-              {user.canShareAds ? 'Disable Ad Sharing' : 'Enable Ad Sharing'}
             </button>
             {!user.activationKey && (
               <button
