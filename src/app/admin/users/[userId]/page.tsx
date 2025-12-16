@@ -562,12 +562,7 @@ export default function UserDetailsPage() {
                     </div>
 
                     <div className="grid grid-cols-3 gap-4 text-sm">
-                      {level.referralBonus > 0 && (
-                        <div className="bg-slate-600/40 rounded-lg p-3">
-                          <p className="text-slate-400">Referral Bonus</p>
-                          <p className="text-slate-100 font-semibold">₹{level.referralBonus}</p>
-                        </div>
-                      )}
+                   
                       {level.levelBonus > 0 && (
                         <div className="bg-slate-600/40 rounded-lg p-3">
                           <p className="text-slate-400">Level Bonus</p>
