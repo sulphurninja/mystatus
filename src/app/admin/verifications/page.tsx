@@ -288,14 +288,14 @@ export default function VerificationsPage() {
                     {/* User Avatar */}
                   <div className="w-14 h-14 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center shadow-lg">
                     <span className="text-white font-bold text-lg">
-                        {share.user.name.charAt(0).toUpperCase()}
+                        {share.user?.name?.charAt(0).toUpperCase() || 'U'}
                       </span>
                     </div>
 
                     {/* Share Details */}
                     <div className="flex-1">
                     <div className="flex items-center space-x-3 mb-2">
-                      <h3 className="text-xl font-bold text-slate-100">{share.user.name}</h3>
+                      <h3 className="text-xl font-bold text-slate-100">{share.user?.name || 'Unknown User'}</h3>
                       <div className={`px-3 py-1 rounded-full text-xs font-semibold ${
                         share.status === 'verified'
                           ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
