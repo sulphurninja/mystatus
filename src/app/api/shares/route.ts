@@ -136,6 +136,7 @@ export async function GET(request: NextRequest) {
         verificationDeadline: share.verificationDeadline,
         status: share.status,
         verifiedAt: share.verifiedAt,
+        proofImage: share.proofImage,
         rejectionReason: share.rejectionReason,
         rewardAmount: share.rewardAmount,
         isRewardCredited: share.isRewardCredited

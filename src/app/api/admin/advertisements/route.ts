@@ -92,7 +92,7 @@ export async function POST(request: NextRequest) {
       image,
       rewardAmount: parseFloat(rewardAmount),
       vendor: vendorId,
-      verificationPeriodHours: parseInt(verificationPeriodHours) || 8
+      verificationPeriodHours: verificationPeriodHours !== undefined ? parseInt(verificationPeriodHours) : 8
     });
 
     // Update vendor's totalAds count

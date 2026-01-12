@@ -60,7 +60,7 @@ const AdvertisementSchema: Schema = new Schema({
   verificationPeriodHours: {
     type: Number,
     default: 8,
-    min: 1,
+    min: 0,
     max: 24
   }
 }, {

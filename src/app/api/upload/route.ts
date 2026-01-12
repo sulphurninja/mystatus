@@ -15,7 +15,7 @@ cloudinary.config({
 
 export async function POST(request: NextRequest) {
   try {
-    const auth = authenticateRequest(request, ['admin']);
+    const auth = authenticateRequest(request, ['admin', 'user']);
     if (auth.error) {
       return NextResponse.json(
         { success: false, message: auth.error.message },
@@ -34,19 +34,22 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate file type
-    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+    const allowedTypes = [
+      'image/jpeg', 'image/jpg', 'image/png', 'image/webp',
+      'video/mp4', 'video/quicktime', 'video/x-m4v', 'video/webm'
+    ];
     if (!allowedTypes.includes(file.type)) {
       return NextResponse.json(
-        { success: false, message: 'Invalid file type. Only JPEG, PNG, and WebP images are allowed.' },
+        { success: false, message: 'Invalid file type. Supported: JPEG, PNG, WebP, and MP4/QuickTime videos.' },
         { status: 400 }
       );
     }
 
-    // Validate file size (max 5MB)
-    const maxSize = 5 * 1024 * 1024; // 5MB
+    // Validate file size (max 50MB)
+    const maxSize = 50 * 1024 * 1024; // 50MB
     if (file.size > maxSize) {
       return NextResponse.json(
-        { success: false, message: 'File too large. Maximum size is 5MB.' },
+        { success: false, message: 'File too large. Maximum size is 50MB.' },
         { status: 400 }
       );
     }
@@ -59,12 +62,15 @@ export async function POST(request: NextRequest) {
     const uploadResult: any = await new Promise((resolve, reject) => {
       const uploadStream = cloudinary.uploader.upload_stream(
         {
-          folder: 'mystatus-advertisements',
-          resource_type: 'image',
-          transformation: [
-            { width: 800, height: 600, crop: 'limit' },
-            { quality: 'auto' }
-          ]
+          folder: 'mystatus-proofs',
+          resource_type: 'auto',
+          // Only apply transformations to images
+          ...(file.type.startsWith('image/') && {
+            transformation: [
+              { width: 1200, height: 1200, crop: 'limit' },
+              { quality: 'auto' }
+            ]
+          })
         },
         (error, result) => {
           if (error) reject(error);

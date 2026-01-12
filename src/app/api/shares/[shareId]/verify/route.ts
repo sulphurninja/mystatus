@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import connectToDatabase from '@/lib/mongodb';
 import Share from '@/models/Share';
+import User from '@/models/User';
+import Transaction from '@/models/Transaction';
 import { authenticateRequest } from '@/middleware/auth';
 
 export async function PUT(
@@ -46,7 +48,7 @@ export async function PUT(
       );
     }
 
-    // Check if the share is still pending and within verification period
+    // Check if the share is still pending
     if (share.status !== 'pending') {
       return NextResponse.json(
         { success: false, message: 'Share is not eligible for verification' },
@@ -55,28 +57,23 @@ export async function PUT(
     }
 
     const now = new Date();
-    if (now > share.verificationDeadline) {
-      // Mark as expired
-      await Share.findByIdAndUpdate(shareId, { status: 'expired' });
-      return NextResponse.json(
-        { success: false, message: 'Verification period has expired' },
-        { status: 400 }
-      );
-    }
 
-    // Update share with proof image
-    await Share.findByIdAndUpdate(shareId, {
-      proofImage,
-      verifiedAt: now,
-      status: 'verified' // For now, auto-verify. In production, this should be reviewed by admin
-    });
+    // Update share with proof image (Keep status as pending for admin review)
+    const updatedShare = await Share.findByIdAndUpdate(
+      shareId,
+      {
+        proofImage,
+        verifiedAt: now
+      },
+      { new: true }
+    );
 
     return NextResponse.json({
       success: true,
-      message: 'Verification submitted successfully',
+      message: 'Verification proof submitted successfully. It is now under review.',
       data: {
         id: share._id,
-        status: 'verified',
+        status: 'pending',
         verifiedAt: now
       }
     });

@@ -52,11 +52,13 @@ export default function AdvertisementsPage() {
   const loadAdvertisements = async () => {
     try {
       setLoading(true);
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        ...getAuthHeaders(),
+      };
+
       const response = await fetch('/api/admin/advertisements', {
-        headers: {
-          'Content-Type': 'application/json',
-          ...getAuthHeaders(),
-        },
+        headers,
       });
       if (response.ok) {
         const data = await response.json();
@@ -74,11 +76,13 @@ export default function AdvertisementsPage() {
 
   const loadVendors = async () => {
     try {
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        ...getAuthHeaders(),
+      };
+
       const response = await fetch('/api/admin/vendors', {
-        headers: {
-          'Content-Type': 'application/json',
-          ...getAuthHeaders(),
-        },
+        headers,
       });
       if (response.ok) {
         const data = await response.json();
@@ -103,27 +107,30 @@ export default function AdvertisementsPage() {
 
     // Upload file if selected
     if (selectedFile) {
-      imageUrl = await uploadImage();
-      if (!imageUrl) return; // Upload failed
+      const uploadedUrl = await uploadImage();
+      if (!uploadedUrl) return; // Upload failed
+      imageUrl = uploadedUrl;
     }
 
     try {
       const method = editingAd ? 'PUT' : 'POST';
       const url = editingAd ? `/api/admin/advertisements/${editingAd._id}` : '/api/admin/advertisements';
 
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        ...getAuthHeaders(),
+      };
+
       const response = await fetch(url, {
         method,
-        headers: {
-          'Content-Type': 'application/json',
-          ...getAuthHeaders(),
-        },
+        headers,
         body: JSON.stringify({
           title: newAd.title,
           description: newAd.description,
           image: imageUrl,
           rewardAmount: parseFloat(newAd.rewardAmount),
           vendorId: newAd.vendorId,
-          verificationPeriodHours: parseInt(newAd.verificationPeriodHours) || 8,
+          verificationPeriodHours: newAd.verificationPeriodHours !== '' ? parseInt(newAd.verificationPeriodHours) : 8,
         }),
       });
       if (response.ok) {
@@ -147,12 +154,14 @@ export default function AdvertisementsPage() {
 
   const toggleAdStatus = async (adId: string) => {
     try {
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        ...getAuthHeaders(),
+      };
+
       const response = await fetch(`/api/admin/advertisements/${adId}/status`, {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          ...getAuthHeaders(),
-        },
+        headers,
       });
 
       if (response.ok) {
@@ -189,7 +198,7 @@ export default function AdvertisementsPage() {
     try {
       const response = await fetch(`/api/admin/advertisements/${adId}`, {
         method: 'DELETE',
-        headers: getAuthHeaders(),
+        headers: getAuthHeaders() as Record<string, string>,
       });
 
       if (response.ok) {
@@ -323,7 +332,7 @@ export default function AdvertisementsPage() {
 
       {/* Search and Add */}
       <div className="flex flex-col lg:flex-row gap-6">
-          <div className="flex-1">
+        <div className="flex-1">
           <div className="relative">
             <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
               <svg className="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -341,12 +350,12 @@ export default function AdvertisementsPage() {
         </div>
         <div className="flex gap-4">
           <select className="px-6 py-4 bg-slate-800/50 border border-slate-700/50 rounded-2xl text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all duration-200">
-              <option value="">All Status</option>
-              <option value="active">Active</option>
-              <option value="inactive">Inactive</option>
-            </select>
-            <button
-              onClick={() => setShowAddModal(true)}
+            <option value="">All Status</option>
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+          </select>
+          <button
+            onClick={() => setShowAddModal(true)}
             className="group relative bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white px-6 py-4 rounded-2xl font-semibold shadow-lg shadow-emerald-500/25 hover:shadow-emerald-500/40 transition-all duration-300 hover:-translate-y-0.5"
           >
             <div className="flex items-center space-x-2">
@@ -355,7 +364,7 @@ export default function AdvertisementsPage() {
               </svg>
               <span>Add Advertisement</span>
             </div>
-            </button>
+          </button>
         </div>
       </div>
 
@@ -405,9 +414,8 @@ export default function AdvertisementsPage() {
             <div key={ad._id} className="group relative bg-gradient-to-br from-slate-800/50 to-slate-900/50 backdrop-blur-xl rounded-2xl p-6 border border-slate-700/50 hover:border-slate-600/50 transition-all duration-300 hover:shadow-2xl hover:shadow-slate-900/20 hover:-translate-y-1">
               {/* Status Indicator */}
               <div className="absolute top-4 right-4">
-                <div className={`w-3 h-3 rounded-full ${
-                  ad.isActive ? 'bg-emerald-400 shadow-lg shadow-emerald-400/50' : 'bg-red-400'
-                }`}></div>
+                <div className={`w-3 h-3 rounded-full ${ad.isActive ? 'bg-emerald-400 shadow-lg shadow-emerald-400/50' : 'bg-red-400'
+                  }`}></div>
               </div>
 
               {/* Header */}
@@ -462,15 +470,14 @@ export default function AdvertisementsPage() {
                   </div>
                   <p className="text-lg font-bold text-amber-400">₹{ad.totalRewardsPaid}</p>
                 </div>
-                  </div>
+              </div>
 
               {/* Status Badge */}
               <div className="flex items-center justify-between">
-                <div className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                  ad.isActive
-                    ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                    : 'bg-red-500/20 text-red-400 border border-red-500/30'
-                }`}>
+                <div className={`px-3 py-1 rounded-full text-xs font-semibold ${ad.isActive
+                  ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                  : 'bg-red-500/20 text-red-400 border border-red-500/30'
+                  }`}>
                   {ad.isActive ? 'Active' : 'Inactive'}
                 </div>
 
@@ -478,11 +485,10 @@ export default function AdvertisementsPage() {
                 <div className="flex space-x-2">
                   <button
                     onClick={() => toggleAdStatus(ad._id)}
-                    className={`px-3 py-2 rounded-xl text-xs font-medium transition-all duration-200 ${
-                      ad.isActive
-                        ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30 border border-red-500/30'
-                        : 'bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 border border-emerald-500/30'
-                    }`}
+                    className={`px-3 py-2 rounded-xl text-xs font-medium transition-all duration-200 ${ad.isActive
+                      ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30 border border-red-500/30'
+                      : 'bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 border border-emerald-500/30'
+                      }`}
                   >
                     {ad.isActive ? 'Deactivate' : 'Activate'}
                   </button>
@@ -511,8 +517,8 @@ export default function AdvertisementsPage() {
           <div className="bg-white rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
             <div className="p-6">
               <h3 className="text-xl font-semibold text-gray-900 mb-6">
-            {editingAd ? 'Edit Advertisement' : 'Add New Advertisement'}
-          </h3>
+                {editingAd ? 'Edit Advertisement' : 'Add New Advertisement'}
+              </h3>
 
               <form className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -587,7 +593,7 @@ export default function AdvertisementsPage() {
                     <input
                       type="number"
                       required
-                      min="1"
+                      min="0"
                       max="24"
                       value={newAd.verificationPeriodHours}
                       onChange={(e) => setNewAd(prev => ({ ...prev, verificationPeriodHours: e.target.value }))}

@@ -89,30 +89,37 @@ export async function PUT(request: NextRequest) {
     }
 
     if (action === 'approve') {
-      // Update share status
-      await Share.findByIdAndUpdate(shareId, {
-        status: 'verified',
-        verifiedAt: new Date()
-        // Note: verifiedBy is not set for admin actions
-      });
+      // Credit user wallet and record transaction
+      const user = await User.findById(share.user);
+      if (user) {
+        const balanceBefore = user.walletBalance;
+        const balanceAfter = balanceBefore + share.rewardAmount;
 
-      // Credit user wallet
-      await User.findByIdAndUpdate(share.user, {
-        $inc: { walletBalance: share.rewardAmount }
-      });
+        await User.findByIdAndUpdate(share.user, {
+          $inc: { walletBalance: share.rewardAmount }
+        });
 
-      // Create transaction record
-      await Transaction.create({
-        user: share.user,
-        type: 'credit',
-        amount: share.rewardAmount,
-        reason: 'reward_earned',
-        description: `Reward for sharing advertisement: ${share.advertisement?.title || 'Unknown Advertisement'}`,
-        reference: share._id,
-        referenceModel: 'Share',
-        balanceBefore: 0, // This would need to be calculated
-        balanceAfter: share.rewardAmount
-      });
+        // Update share status and flag
+        await Share.findByIdAndUpdate(shareId, {
+          status: 'verified',
+          verifiedAt: new Date(),
+          isRewardCredited: true,
+          creditedAt: new Date()
+        });
+
+        // Create transaction record
+        await Transaction.create({
+          user: share.user,
+          type: 'credit',
+          amount: share.rewardAmount,
+          reason: 'reward_earned',
+          description: `Reward for sharing advertisement: ${share.advertisement?.title || 'Unknown Advertisement'}`,
+          reference: share._id,
+          referenceModel: 'Share',
+          balanceBefore,
+          balanceAfter
+        });
+      }
 
       return NextResponse.json({
         success: true,

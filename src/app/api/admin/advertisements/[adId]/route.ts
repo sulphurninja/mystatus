@@ -29,7 +29,7 @@ export async function PUT(
         image,
         rewardAmount: parseFloat(rewardAmount),
         vendor: vendorId,
-        verificationPeriodHours: parseInt(verificationPeriodHours) || 8,
+        verificationPeriodHours: verificationPeriodHours !== undefined ? parseInt(verificationPeriodHours) : 8,
       },
       { new: true, runValidators: true }
     ).populate('vendor', 'name businessName');
