@@ -13,7 +13,7 @@ export default function ReferralLandingClient({ referralCode }: ReferralLandingC
   const [referrerName, setReferrerName] = useState<string | null>(null);
 
   // APK Download URL - Update this to your actual APK URL
-  const APK_DOWNLOAD_URL = 'https://mystatusmlm.vercel.app/download/mystatus.apk';
+  const APK_DOWNLOAD_URL = 'https://mystatusads.com/download/mystatus.apk';
 
   useEffect(() => {
     // Optionally fetch referrer info
@@ -80,16 +80,16 @@ export default function ReferralLandingClient({ referralCode }: ReferralLandingC
           {/* Header */}
           <div className="bg-gradient-to-r from-emerald-500 to-teal-600 p-6 text-center">
             <div className="w-24 h-24 bg-white rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-xl overflow-hidden">
-              <Image 
-                src="/mystatus.jpeg" 
-                alt="MyStatus Logo" 
-                width={96} 
+              <Image
+                src="/mystatus.jpeg"
+                alt="MyStatus Logo"
+                width={96}
                 height={96}
                 className="object-cover"
               />
             </div>
             <h1 className="text-3xl font-bold text-white mb-2">MyStatus</h1>
-            <p className="text-emerald-100 text-sm">Earn Money by Sharing Ads</p>
+            <p className="text-emerald-100 text-sm">Unlock Rewards by Sharing Content</p>
           </div>
 
           {/* Content */}
@@ -106,7 +106,7 @@ export default function ReferralLandingClient({ referralCode }: ReferralLandingC
                 )}
               </p>
               <p className="text-slate-400 text-sm">
-                Download the app and start earning by sharing advertisements
+                Download the app and start unlocking rewards by sharing approved content
               </p>
             </div>
 
@@ -164,7 +164,7 @@ export default function ReferralLandingClient({ referralCode }: ReferralLandingC
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
                 </div>
-                <p className="text-slate-400 text-xs">Earn Money</p>
+                <p className="text-slate-400 text-xs">Unlock Rewards</p>
               </div>
               <div className="text-center">
                 <div className="w-12 h-12 bg-teal-500/10 rounded-xl flex items-center justify-center mx-auto mb-2">
@@ -172,7 +172,7 @@ export default function ReferralLandingClient({ referralCode }: ReferralLandingC
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
                   </svg>
                 </div>
-                <p className="text-slate-400 text-xs">Share Ads</p>
+                <p className="text-slate-400 text-xs">Share Content</p>
               </div>
               <div className="text-center">
                 <div className="w-12 h-12 bg-purple-500/10 rounded-xl flex items-center justify-center mx-auto mb-2">
