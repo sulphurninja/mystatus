@@ -37,11 +37,11 @@ export async function GET(request: NextRequest) {
     let keyStatus = null;
 
     if (user?.activationKey) {
-      const key = await ActivationKey.findOne({ 
+      const key = await ActivationKey.findOne({
         key: user.activationKey,
-        usedBy: userId 
+        usedBy: userId
       });
-      
+
       if (key) {
         const remainingLimit = key.withdrawalLimit - key.totalWithdrawn;
         keyStatus = {
@@ -112,9 +112,9 @@ export async function POST(request: NextRequest) {
     const { amount, activationKey, paymentDetails } = await request.json();
 
     // Validate amount
-    if (!amount || amount <= 0) {
+    if (!amount || amount < 500) {
       return NextResponse.json(
-        { success: false, message: 'Invalid withdrawal amount' },
+        { success: false, message: 'Minimum withdrawal amount is 500' },
         { status: 400 }
       );
     }
@@ -187,8 +187,8 @@ export async function POST(request: NextRequest) {
       if (keyToUse.isPaused) {
         await dbSession.abortTransaction();
         return NextResponse.json(
-          { 
-            success: false, 
+          {
+            success: false,
             message: `Your key has reached the withdrawal limit of ₹${keyToUse.withdrawalLimit}. Please renew your key to continue withdrawing.`,
             needsRenewal: true,
             renewalPrice: keyToUse.price
@@ -202,8 +202,8 @@ export async function POST(request: NextRequest) {
       if (amount > remainingLimit) {
         await dbSession.abortTransaction();
         return NextResponse.json(
-          { 
-            success: false, 
+          {
+            success: false,
             message: `You can only withdraw ₹${remainingLimit} more with your current key. Total limit is ₹${keyToUse.withdrawalLimit}.`,
             remainingLimit: remainingLimit,
             needsRenewal: remainingLimit <= 0,
@@ -216,7 +216,7 @@ export async function POST(request: NextRequest) {
       // Update the key's total withdrawn amount
       const newTotalWithdrawn = keyToUse.totalWithdrawn + amount;
       const shouldPause = newTotalWithdrawn >= keyToUse.withdrawalLimit;
-      
+
       await ActivationKey.findByIdAndUpdate(keyToUse._id, {
         totalWithdrawn: newTotalWithdrawn,
         isPaused: shouldPause
@@ -235,7 +235,7 @@ export async function POST(request: NextRequest) {
       await dbSession.commitTransaction();
 
       const newRemainingLimit = keyToUse.withdrawalLimit - newTotalWithdrawn;
-      
+
       return NextResponse.json({
         success: true,
         message: 'Withdrawal request submitted successfully. Admin will review and process your request.',
@@ -316,7 +316,7 @@ async function processKeyActivationCommissions(userId: string, referrerId: strin
         // Get current balance before updating
         const currentUser = await User.findById(chainItem.userId).session(session);
         if (!currentUser) continue;
-        
+
         const balanceBefore = currentUser.walletBalance;
 
         // Create commission record
