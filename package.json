@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "cleanup:duplicates": "node scripts/cleanup-duplicate-shares.js"
   },
   "dependencies": {
     "@radix-ui/react-label": "^2.1.8",

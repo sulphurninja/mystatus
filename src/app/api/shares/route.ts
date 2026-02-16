@@ -25,12 +25,27 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Validate MongoDB ObjectId format
+    if (!advertisementId.match(/^[0-9a-fA-F]{24}$/)) {
+      return NextResponse.json(
+        { success: false, message: 'Invalid advertisement ID format' },
+        { status: 400 }
+      );
+    }
+
     // Get advertisement details
     const advertisement = await Advertisement.findById(advertisementId);
 
-    if (!advertisement || !advertisement.isActive) {
+    if (!advertisement) {
       return NextResponse.json(
-        { success: false, message: 'Advertisement not found or inactive' },
+        { success: false, message: 'Advertisement not found. It may have been removed.' },
+        { status: 404 }
+      );
+    }
+
+    if (!advertisement.isActive) {
+      return NextResponse.json(
+        { success: false, message: 'This advertisement is no longer active' },
         { status: 404 }
       );
     }
@@ -50,19 +65,38 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check if user already has a pending verification request for this advertisement
-    // Allow unlimited shares until verified, but only one pending verification at a time
-    const existingPendingShare = await Share.findOne({
+    // Check if user already has ANY share (pending/verified/rejected) for this advertisement
+    const existingShare = await Share.findOne({
       user: auth.user!.id,
       advertisement: advertisementId,
-      status: 'pending'
-    });
+      status: { $in: ['pending', 'verified'] }
+    }).populate('advertisement', 'title');
 
-    if (existingPendingShare) {
-      return NextResponse.json(
-        { success: false, message: 'You already have a pending verification request for this advertisement. Please wait for it to be reviewed before submitting another.' },
-        { status: 400 }
-      );
+    if (existingShare) {
+      if (existingShare.status === 'verified') {
+        return NextResponse.json(
+          { success: false, message: 'You have already been rewarded for sharing this advertisement.' },
+          { status: 400 }
+        );
+      }
+      
+      // Return the existing pending share instead of creating a duplicate
+      return NextResponse.json({
+        success: true,
+        message: 'You already have a pending share for this advertisement',
+        data: {
+          id: existingShare._id,
+          advertisement: existingShare.advertisement ? {
+            id: existingShare.advertisement._id,
+            title: existingShare.advertisement.title
+          } : null,
+          sharedAt: existingShare.sharedAt || existingShare.createdAt,
+          verificationDeadline: existingShare.verificationDeadline,
+          status: existingShare.status,
+          rewardAmount: existingShare.rewardAmount,
+          proofImage: existingShare.proofImage || null
+        }
+      });
     }
 
     // Check share limit logic
@@ -107,16 +141,49 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Create share record
+    // Create share record with duplicate protection
     const verificationDeadline = new Date();
     verificationDeadline.setHours(verificationDeadline.getHours() + advertisement.verificationPeriodHours);
 
-    const share = await Share.create({
-      user: auth.user!.id,
-      advertisement: advertisementId,
-      verificationDeadline,
-      rewardAmount: advertisement.rewardAmount
-    });
+    let share;
+    try {
+      share = await Share.create({
+        user: auth.user!.id,
+        advertisement: advertisementId,
+        verificationDeadline,
+        rewardAmount: advertisement.rewardAmount,
+        status: 'pending'
+      });
+    } catch (error: any) {
+      // Handle duplicate key error (race condition)
+      if (error.code === 11000) {
+        const existingShare = await Share.findOne({
+          user: auth.user!.id,
+          advertisement: advertisementId,
+          status: 'pending'
+        }).populate('advertisement', 'title');
+
+        if (existingShare) {
+          return NextResponse.json({
+            success: true,
+            message: 'You already have a pending share for this advertisement',
+            data: {
+              id: existingShare._id,
+              advertisement: existingShare.advertisement ? {
+                id: existingShare.advertisement._id,
+                title: existingShare.advertisement.title
+              } : null,
+              sharedAt: existingShare.sharedAt || existingShare.createdAt,
+              verificationDeadline: existingShare.verificationDeadline,
+              status: existingShare.status,
+              rewardAmount: existingShare.rewardAmount,
+              proofImage: existingShare.proofImage || null
+            }
+          });
+        }
+      }
+      throw error;
+    }
 
     // Update advertisement share count
     await Advertisement.findByIdAndUpdate(advertisementId, {
@@ -167,8 +234,10 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       success: true,
       data: shares.map(share => ({
+        _id: share._id,
         id: share._id,
         advertisement: share.advertisement ? {
+          _id: share.advertisement._id,
           id: share.advertisement._id,
           title: share.advertisement.title,
           image: share.advertisement.image,
@@ -179,9 +248,12 @@ export async function GET(request: NextRequest) {
         status: share.status,
         verifiedAt: share.verifiedAt,
         proofImage: share.proofImage,
+        proofUrl: share.proofImage,
         rejectionReason: share.rejectionReason,
         rewardAmount: share.rewardAmount,
-        isRewardCredited: share.isRewardCredited
+        reward: share.rewardAmount,
+        isRewardCredited: share.isRewardCredited,
+        createdAt: share.createdAt || share.sharedAt
       }))
     });
 

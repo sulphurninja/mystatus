@@ -30,6 +30,14 @@ export async function PUT(
       );
     }
 
+    // Validate that proofImage is a valid HTTP/HTTPS URL (not a local file path)
+    if (!proofImage.startsWith('http://') && !proofImage.startsWith('https://')) {
+      return NextResponse.json(
+        { success: false, message: 'Invalid proof image URL. Please upload the image again.' },
+        { status: 400 }
+      );
+    }
+
     // Find the share
     const share = await Share.findById(shareId).populate('advertisement');
 

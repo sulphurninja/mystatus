@@ -88,8 +88,16 @@ export async function GET(request: NextRequest) {
       success: true,
       data: availableKeys.map(key => ({
         id: key._id,
-        key: key.key,
+        name: key.price >= 5000 ? 'Premium Key' : key.price >= 3000 ? 'Standard Key' : 'Basic Key',
+        description: 'Unlock multi-level earnings and higher withdrawal limits',
         price: key.price,
+        validityDays: 30,
+        features: [
+          'Required for withdrawals',
+          'Earn MLM commissions (6 levels)',
+          'Higher limits with more referrals',
+          'Renewable after reaching limit'
+        ],
         createdBy: key.createdBy ? {
           id: key.createdBy._id,
           name: key.createdBy.name,
@@ -120,9 +128,17 @@ export async function POST(request: NextRequest) {
 
     await connectToDatabase();
 
-    const { keyId, referralCode } = await request.json();
+    const { keyId, tierId, referralCode } = await request.json();
 
-    if (!keyId) {
+    // Support both keyId (direct) and tierId (from marketplace UI)
+    let finalKeyId = keyId;
+    
+    if (!finalKeyId && tierId) {
+      // If tierId is provided, find the first available key with matching ID
+      finalKeyId = tierId;
+    }
+
+    if (!finalKeyId) {
       return NextResponse.json(
         { success: false, message: 'Key ID is required' },
         { status: 400 }
@@ -130,7 +146,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Get the key
-    const key = await ActivationKey.findById(keyId);
+    const key = await ActivationKey.findById(finalKeyId);
     if (!key || key.isUsed || !key.isForSale) {
       return NextResponse.json(
         { success: false, message: 'Key not available' },

@@ -229,30 +229,63 @@ export default function VerificationsPage() {
             <div key={share._id} className="group bg-slate-800/30 backdrop-blur-md rounded-[2.5rem] border border-slate-700/50 hover:border-indigo-500/40 transition-all duration-300 overflow-hidden flex flex-col md:flex-row">
               {/* Media Preview Section */}
               <div className="md:w-64 h-64 md:h-auto relative bg-black/40 overflow-hidden">
-                {share.proofImage ? (
-                  share.proofImage.match(/\.(mp4|mov|m4v|webm)/) || share.proofImage.includes('video/upload') ? (
-                    <video
-                      src={share.proofImage}
-                      className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
-                      muted
-                      onMouseOver={(e) => e.currentTarget.play()}
-                      onMouseOut={(e) => e.currentTarget.pause()}
-                    />
-                  ) : (
-                    <img
-                      src={share.proofImage}
-                      alt="Proof"
-                      className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
-                    />
-                  )
-                ) : (
-                  <div className="w-full h-full flex flex-col items-center justify-center text-slate-600 gap-2">
-                    <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                    </svg>
-                    <span className="text-xs font-semibold uppercase tracking-widest">No Proof</span>
-                  </div>
-                )}
+                {(() => {
+                  // Helper to check if URL is displayable (http/https)
+                  const isDisplayableUrl = (url?: string) => url && (url.startsWith('http://') || url.startsWith('https://'));
+                  const isVideoUrl = (url?: string) => url && (url.match(/\.(mp4|mov|m4v|webm)/) || url.includes('video/upload'));
+
+                  // Use proof image if it's a valid URL, otherwise fall back to advertisement image
+                  const displayProofImage = isDisplayableUrl(share.proofImage) ? share.proofImage : null;
+                  const displayAdImage = isDisplayableUrl(share.advertisement?.image) ? share.advertisement.image : null;
+                  const imageToShow = displayProofImage || displayAdImage;
+
+                  if (displayProofImage && isVideoUrl(displayProofImage)) {
+                    return (
+                      <video
+                        src={displayProofImage}
+                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
+                        muted
+                        onMouseOver={(e) => e.currentTarget.play()}
+                        onMouseOut={(e) => e.currentTarget.pause()}
+                      />
+                    );
+                  } else if (imageToShow) {
+                    return (
+                      <>
+                        <img
+                          src={imageToShow}
+                          alt={displayProofImage ? "Proof" : "Advertisement"}
+                          className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
+                        />
+                        {/* Badge to indicate if showing ad image instead of proof */}
+                        {!displayProofImage && displayAdImage && (
+                          <div className="absolute bottom-2 right-2 px-2 py-1 bg-black/60 backdrop-blur-sm rounded-lg text-xs text-slate-300 font-medium">
+                            Ad Image
+                          </div>
+                        )}
+                        {/* Show warning if proof was submitted but is a local file (can't be displayed) */}
+                        {share.proofImage && !displayProofImage && (
+                          <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/70 backdrop-blur-sm">
+                            <svg className="w-12 h-12 text-orange-400 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-.833-2.694-.833-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                            </svg>
+                            <span className="text-orange-400 font-bold text-sm text-center px-4">Proof Upload Failed</span>
+                            <span className="text-orange-300/70 text-xs mt-1 text-center px-4">User needs to resubmit from app</span>
+                          </div>
+                        )}
+                      </>
+                    );
+                  } else {
+                    return (
+                      <div className="w-full h-full flex flex-col items-center justify-center text-slate-600 gap-2">
+                        <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                        <span className="text-xs font-semibold uppercase tracking-widest">No Image</span>
+                      </div>
+                    );
+                  }
+                })()}
                 {/* Status Overlay */}
                 <div className="absolute top-4 left-4">
                   <span className={`px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider backdrop-blur-md border ${share.status === 'verified'
