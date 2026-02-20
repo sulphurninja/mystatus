@@ -9,6 +9,7 @@ export interface IVendor extends Document {
   businessName: string;
   businessAddress?: string;
   walletBalance: number;
+  adsRemaining: number;
   isActive: boolean;
   totalAds: number;
   totalShares: number;
@@ -53,6 +54,11 @@ const VendorSchema: Schema = new Schema({
     type: String
   },
   walletBalance: {
+    type: Number,
+    default: 0,
+    min: 0
+  },
+  adsRemaining: {
     type: Number,
     default: 0,
     min: 0

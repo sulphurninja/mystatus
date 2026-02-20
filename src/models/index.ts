@@ -11,6 +11,8 @@ import './MyStatusAd';
 import './MyStatusShare';
 import './WithdrawalRequest';
 import './KeyTier';
+import './Package';
+import './VendorPackage';
 
 export {};
 

@@ -10,6 +10,7 @@ interface Vendor {
   businessName: string;
   phone?: string;
   walletBalance: number;
+  adsRemaining?: number;
   totalAds: number;
   totalShares: number;
   totalEarnings: number;
@@ -17,10 +18,24 @@ interface Vendor {
   createdAt: string;
 }
 
+interface Package {
+  _id: string;
+  name: string;
+  price: number;
+  adLimit: number;
+  isActive: boolean;
+}
+
 export default function VendorsPage() {
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showAssignModal, setShowAssignModal] = useState(false);
+  const [selectedVendor, setSelectedVendor] = useState<Vendor | null>(null);
+  const [packages, setPackages] = useState<Package[]>([]);
+  const [selectedPackageId, setSelectedPackageId] = useState('');
+  const [assigning, setAssigning] = useState(false);
+  const [assignMessage, setAssignMessage] = useState('');
   const [newVendor, setNewVendor] = useState({
     name: '',
     email: '',
@@ -88,6 +103,53 @@ export default function VendorsPage() {
       }
     } catch (error) {
       console.error('Error adding vendor:', error);
+    }
+  };
+
+  const loadPackages = async () => {
+    try {
+      const res = await fetch('/api/admin/packages', {
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setPackages((data.packages || []).filter((p: Package) => p.isActive));
+      }
+    } catch (e) {
+      console.error('Error loading packages:', e);
+    }
+  };
+
+  const openAssignModal = (vendor: Vendor) => {
+    setSelectedVendor(vendor);
+    setSelectedPackageId('');
+    setAssignMessage('');
+    loadPackages();
+    setShowAssignModal(true);
+  };
+
+  const handleAssignPackage = async () => {
+    if (!selectedVendor || !selectedPackageId) return;
+    setAssigning(true);
+    setAssignMessage('');
+    try {
+      const res = await fetch(`/api/admin/vendors/${selectedVendor._id}/assign-package`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+        body: JSON.stringify({ packageId: selectedPackageId }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setAssignMessage(data.message);
+        await loadVendors();
+        setTimeout(() => setShowAssignModal(false), 2000);
+      } else {
+        setAssignMessage(data.message || 'Failed to assign package');
+      }
+    } catch (e) {
+      setAssignMessage('Error assigning package');
+    } finally {
+      setAssigning(false);
     }
   };
 
@@ -224,8 +286,8 @@ export default function VendorsPage() {
                     <th className="px-6 py-4 font-semibold">Business</th>
                     <th className="px-6 py-4 font-semibold">Contact</th>
                     <th className="px-6 py-4 font-semibold">Balance</th>
-                    <th className="px-6 py-4 font-semibold">Ads</th>
-                    <th className="px-6 py-4 font-semibold">Shares</th>
+                    <th className="px-6 py-4 font-semibold">Ads Left</th>
+                    <th className="px-6 py-4 font-semibold">Total Ads</th>
                     <th className="px-6 py-4 font-semibold">Earnings</th>
                     <th className="px-6 py-4 font-semibold">Status</th>
                     <th className="px-6 py-4 font-semibold">Actions</th>
@@ -260,10 +322,12 @@ export default function VendorsPage() {
                         <span className="font-semibold text-emerald-400">₹{vendor.walletBalance}</span>
                       </td>
                       <td className="px-6 py-4">
-                        <span className="text-slate-100">{vendor.totalAds}</span>
+                        <span className={`font-semibold ${(vendor.adsRemaining || 0) > 0 ? 'text-violet-400' : 'text-slate-500'}`}>
+                          {vendor.adsRemaining || 0}
+                        </span>
                       </td>
                       <td className="px-6 py-4">
-                        <span className="text-slate-100">{vendor.totalShares}</span>
+                        <span className="text-slate-100">{vendor.totalAds}</span>
                       </td>
                       <td className="px-6 py-4">
                         <span className="font-semibold text-emerald-400">₹{vendor.totalEarnings}</span>
@@ -280,6 +344,12 @@ export default function VendorsPage() {
                       <td className="px-6 py-4">
                         <div className="flex items-center space-x-2">
                           <button
+                            onClick={() => openAssignModal(vendor)}
+                            className="px-3 py-1 bg-violet-500/20 text-violet-400 hover:bg-violet-500/30 rounded-lg text-xs font-medium transition-all duration-200 border border-violet-500/30"
+                          >
+                            Assign Package
+                          </button>
+                          <button
                             onClick={() => toggleVendorStatus(vendor._id)}
                             className={`px-3 py-1 rounded-lg text-xs font-medium transition-all duration-200 ${
                               vendor.isActive
@@ -289,15 +359,109 @@ export default function VendorsPage() {
                           >
                             {vendor.isActive ? 'Deactivate' : 'Activate'}
                           </button>
-                          <button className="px-3 py-1 bg-slate-700/50 text-slate-300 hover:bg-slate-600/50 rounded-lg text-xs font-medium transition-all duration-200 border border-slate-600/50">
-                            Edit
-                          </button>
                         </div>
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Assign Package Modal */}
+      {showAssignModal && selectedVendor && (
+        <div className="fixed inset-0 backdrop-blur-sm bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-gradient-to-br from-slate-800/95 to-slate-900/95 backdrop-blur-xl rounded-3xl max-w-lg w-full border border-slate-700/50 shadow-2xl">
+            <div className="flex items-center justify-between p-8 pb-6">
+              <div className="flex items-center space-x-3">
+                <div className="w-12 h-12 bg-gradient-to-br from-violet-500 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg">
+                  <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="text-2xl font-bold text-slate-100">Assign Package</h3>
+                  <p className="text-slate-400 text-sm">to {selectedVendor.name} ({selectedVendor.businessName})</p>
+                </div>
+              </div>
+              <button onClick={() => setShowAssignModal(false)} className="w-8 h-8 bg-slate-700/50 hover:bg-slate-600/50 rounded-xl flex items-center justify-center transition-colors">
+                <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="px-8 pb-8 space-y-5">
+              <div className="bg-slate-700/30 rounded-xl p-4 flex items-center justify-between">
+                <span className="text-slate-400 text-sm">Current ads remaining</span>
+                <span className="text-violet-400 font-bold text-lg">{selectedVendor.adsRemaining || 0}</span>
+              </div>
+
+              {assignMessage && (
+                <div className={`px-4 py-3 rounded-xl text-sm ${
+                  assignMessage.includes('assigned') || assignMessage.includes('added')
+                    ? 'bg-emerald-500/10 border border-emerald-500/20 text-emerald-400'
+                    : 'bg-red-500/10 border border-red-500/20 text-red-400'
+                }`}>
+                  {assignMessage}
+                </div>
+              )}
+
+              {packages.length === 0 ? (
+                <div className="text-center py-8">
+                  <p className="text-slate-400">No active packages available.</p>
+                  <p className="text-slate-500 text-sm mt-1">Create packages first in the Packages section.</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <label className="block text-sm font-medium text-slate-300">Select a Package</label>
+                  {packages.map((pkg) => (
+                    <div
+                      key={pkg._id}
+                      onClick={() => setSelectedPackageId(pkg._id)}
+                      className={`p-4 rounded-xl border cursor-pointer transition-all duration-200 ${
+                        selectedPackageId === pkg._id
+                          ? 'bg-violet-500/20 border-violet-500/50 shadow-lg shadow-violet-500/10'
+                          : 'bg-slate-700/20 border-slate-700/30 hover:border-slate-600/50'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-slate-100 font-semibold">{pkg.name}</p>
+                          <p className="text-slate-400 text-sm">{pkg.adLimit} ads &middot; ₹{pkg.price.toLocaleString()}</p>
+                        </div>
+                        <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${
+                          selectedPackageId === pkg._id ? 'border-violet-400 bg-violet-400' : 'border-slate-600'
+                        }`}>
+                          {selectedPackageId === pkg._id && (
+                            <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                            </svg>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div className="flex space-x-4 pt-4">
+                <button
+                  onClick={() => setShowAssignModal(false)}
+                  className="flex-1 px-6 py-4 bg-slate-700/50 hover:bg-slate-600/50 text-slate-300 hover:text-slate-200 rounded-2xl font-semibold transition-all duration-200 border border-slate-600/50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleAssignPackage}
+                  disabled={assigning || !selectedPackageId}
+                  className="flex-1 px-6 py-4 bg-gradient-to-r from-violet-500 to-purple-600 hover:from-violet-600 hover:to-purple-700 text-white rounded-2xl font-semibold shadow-lg shadow-violet-500/25 hover:shadow-violet-500/40 transition-all duration-300 hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {assigning ? 'Assigning...' : 'Assign Package'}
+                </button>
+              </div>
             </div>
           </div>
         </div>

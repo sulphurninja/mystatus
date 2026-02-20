@@ -28,6 +28,7 @@ export async function GET(request: NextRequest) {
         businessName: vendor.businessName,
         phone: vendor.phone,
         walletBalance: vendor.walletBalance,
+        adsRemaining: vendor.adsRemaining || 0,
         totalAds: vendor.totalAds,
         totalShares: vendor.totalShares,
         totalEarnings: vendor.totalEarnings,
