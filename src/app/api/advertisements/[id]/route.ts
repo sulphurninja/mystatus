@@ -69,7 +69,9 @@ export async function GET(
         totalShares: advertisement.totalShares,
         totalVerifiedShares: advertisement.totalVerifiedShares,
         isActive: advertisement.isActive,
-        createdAt: advertisement.createdAt
+        createdAt: advertisement.createdAt,
+        commissionEnabled: !!advertisement.commissionEnabled,
+        commissionNote: advertisement.commissionNote || ''
       }
     });
 

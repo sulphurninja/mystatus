@@ -25,7 +25,9 @@ export async function GET(request: NextRequest) {
           businessName: ad.vendor.businessName
         },
         totalShares: ad.totalShares,
-        verificationPeriodHours: ad.verificationPeriodHours
+        verificationPeriodHours: ad.verificationPeriodHours,
+        commissionEnabled: !!ad.commissionEnabled,
+        commissionNote: ad.commissionNote || ''
       }))
     });
 

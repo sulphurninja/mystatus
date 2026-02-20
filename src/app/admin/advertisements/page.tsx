@@ -18,6 +18,8 @@ interface Advertisement {
   totalVerifiedShares: number;
   totalRewardsPaid: number;
   verificationPeriodHours: number;
+  commissionEnabled?: boolean;
+  commissionNote?: string;
   createdAt: string;
 }
 
@@ -34,6 +36,8 @@ export default function AdvertisementsPage() {
     rewardAmount: '',
     vendorId: '',
     verificationPeriodHours: '8',
+    commissionEnabled: false,
+    commissionNote: '',
   });
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -131,6 +135,8 @@ export default function AdvertisementsPage() {
           rewardAmount: parseFloat(newAd.rewardAmount),
           vendorId: newAd.vendorId,
           verificationPeriodHours: newAd.verificationPeriodHours !== '' ? parseInt(newAd.verificationPeriodHours) : 8,
+          commissionEnabled: newAd.commissionEnabled,
+          commissionNote: newAd.commissionNote?.trim() || '',
         }),
       });
       if (response.ok) {
@@ -143,6 +149,8 @@ export default function AdvertisementsPage() {
           rewardAmount: '',
           vendorId: '',
           verificationPeriodHours: '8',
+          commissionEnabled: false,
+          commissionNote: '',
         });
         setSelectedFile(null);
         setEditingAd(null);
@@ -186,6 +194,8 @@ export default function AdvertisementsPage() {
       rewardAmount: ad.rewardAmount.toString(),
       vendorId: ad.vendor._id,
       verificationPeriodHours: ad.verificationPeriodHours.toString(),
+      commissionEnabled: !!ad.commissionEnabled,
+      commissionNote: ad.commissionNote || '',
     });
     setShowAddModal(true);
   };
@@ -600,6 +610,28 @@ export default function AdvertisementsPage() {
                       className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
                     />
                   </div>
+                </div>
+
+                <div className="space-y-3">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={newAd.commissionEnabled}
+                      onChange={(e) => setNewAd(prev => ({ ...prev, commissionEnabled: e.target.checked }))}
+                      className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    />
+                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Enable commission (e.g. 2% if you sell this)</span>
+                  </label>
+                  {newAd.commissionEnabled && (
+                    <input
+                      type="text"
+                      maxLength={200}
+                      value={newAd.commissionNote}
+                      onChange={(e) => setNewAd(prev => ({ ...prev, commissionNote: e.target.value }))}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
+                      placeholder="e.g. 2% commission if you sell this property"
+                    />
+                  )}
                 </div>
 
                 <div>

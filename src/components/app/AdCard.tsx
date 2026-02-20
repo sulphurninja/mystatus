@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import CoinAmount from './CoinAmount';
-import { Clock, Share2, Zap } from 'lucide-react';
+import { Clock, Share2, Zap, Percent } from 'lucide-react';
 
 interface Advertisement {
   _id: string;
@@ -16,6 +16,8 @@ interface Advertisement {
   verificationPeriod: 'instant' | 'hour1' | 'hour2' | 'hour3' | 'hour4' | 'hour5' | 'hour6' | 'hour12' | 'hour24';
   views?: number;
   shares?: number;
+  commissionEnabled?: boolean;
+  commissionNote?: string;
 }
 
 interface AdCardProps {
@@ -86,6 +88,13 @@ export default function AdCard({ ad, onClick }: AdCardProps) {
         <p className="text-slate-400 text-sm line-clamp-2 mb-3 leading-relaxed">
           {ad.description}
         </p>
+
+        {ad.commissionEnabled && ad.commissionNote && (
+          <div className="flex items-start gap-2 mb-3 p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/20">
+            <Percent className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
+            <span className="text-xs text-amber-200/90">{ad.commissionNote}</span>
+          </div>
+        )}
 
         {/* Footer */}
         <div className="flex items-center justify-between pt-3 border-t border-white/5">

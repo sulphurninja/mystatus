@@ -14,6 +14,7 @@ import {
   XCircle,
   Loader2,
   AlertCircle,
+  Percent,
 } from 'lucide-react';
 
 interface Ad {
@@ -24,6 +25,8 @@ interface Ad {
   reward: number;
   verificationPeriod: string;
   vendor?: { name: string };
+  commissionEnabled?: boolean;
+  commissionNote?: string;
 }
 
 export default function ShareAdPage({ params }: { params: Promise<{ id: string }> }) {
@@ -61,6 +64,8 @@ export default function ShareAdPage({ params }: { params: Promise<{ id: string }
           reward: adData.rewardAmount || adData.reward,
           verificationPeriod: adData.verificationPeriodHours ? `${adData.verificationPeriodHours}h` : (adData.verificationPeriod || 'instant'),
           vendor: adData.vendor,
+          commissionEnabled: !!adData.commissionEnabled,
+          commissionNote: adData.commissionNote || '',
         });
       } else {
         // Ad not found
@@ -349,6 +354,12 @@ export default function ShareAdPage({ params }: { params: Promise<{ id: string }
           )}
           <div className="p-4">
             <h3 className="text-lg font-bold text-white mb-2">{ad.title}</h3>
+            {ad.commissionEnabled && ad.commissionNote && (
+              <div className="flex items-start gap-2 mb-3 p-3 rounded-xl bg-amber-500/10 border border-amber-500/20">
+                <Percent className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
+                <span className="text-sm text-amber-200/90">{ad.commissionNote}</span>
+              </div>
+            )}
             <div className="flex items-center justify-between">
               <span className="text-sm text-slate-400">Reward</span>
               <CoinAmount amount={ad.reward} size="md" />

@@ -67,7 +67,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { title, description, image, rewardAmount, verificationPeriodHours } = await request.json();
+    const { title, description, image, rewardAmount, verificationPeriodHours, commissionEnabled, commissionNote } = await request.json();
 
     if (!title || !description || !image || rewardAmount === undefined) {
       return NextResponse.json(
@@ -82,7 +82,9 @@ export async function POST(request: NextRequest) {
       image,
       rewardAmount,
       vendor: vendor._id,
-      verificationPeriodHours: verificationPeriodHours || 8
+      verificationPeriodHours: verificationPeriodHours || 8,
+      commissionEnabled: !!commissionEnabled,
+      commissionNote: commissionNote ? String(commissionNote).trim().slice(0, 200) : ''
     });
 
     vendor.adsRemaining -= 1;

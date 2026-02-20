@@ -53,6 +53,8 @@ export default function DiscoverPage() {
         views: 0,
         shares: ad.totalShares || 0,
         createdAt: ad.createdAt,
+        commissionEnabled: !!ad.commissionEnabled,
+        commissionNote: ad.commissionNote || '',
       }));
       
       setAds(mappedAds);

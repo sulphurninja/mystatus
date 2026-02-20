@@ -19,7 +19,7 @@ export async function PUT(
     await connectToDatabase();
 
     const { adId } = await params;
-    const { title, description, image, rewardAmount, vendorId, verificationPeriodHours } = await request.json();
+    const { title, description, image, rewardAmount, vendorId, verificationPeriodHours, commissionEnabled, commissionNote } = await request.json();
 
     const advertisement = await Advertisement.findByIdAndUpdate(
       adId,
@@ -30,6 +30,8 @@ export async function PUT(
         rewardAmount: parseFloat(rewardAmount),
         vendor: vendorId,
         verificationPeriodHours: verificationPeriodHours !== undefined ? parseInt(verificationPeriodHours) : 8,
+        commissionEnabled: !!commissionEnabled,
+        commissionNote: commissionNote ? String(commissionNote).trim().slice(0, 200) : ''
       },
       { new: true, runValidators: true }
     ).populate('vendor', 'name businessName');
@@ -56,6 +58,8 @@ export async function PUT(
         totalVerifiedShares: advertisement.totalVerifiedShares,
         totalRewardsPaid: advertisement.totalRewardsPaid,
         verificationPeriodHours: advertisement.verificationPeriodHours,
+        commissionEnabled: !!advertisement.commissionEnabled,
+        commissionNote: advertisement.commissionNote || '',
         createdAt: advertisement.createdAt,
       }
     });

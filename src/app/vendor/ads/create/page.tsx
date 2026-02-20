@@ -9,6 +9,8 @@ export default function CreateAdPage() {
     description: '',
     rewardAmount: '',
     verificationPeriodHours: '8',
+    commissionEnabled: false,
+    commissionNote: '',
   });
   const [imageUrl, setImageUrl] = useState('');
   const [imagePreview, setImagePreview] = useState('');
@@ -107,6 +109,8 @@ export default function CreateAdPage() {
           image: imageUrl,
           rewardAmount: Number(formData.rewardAmount),
           verificationPeriodHours: Number(formData.verificationPeriodHours),
+          commissionEnabled: formData.commissionEnabled,
+          commissionNote: formData.commissionNote?.trim() || '',
         }),
       });
 
@@ -224,6 +228,28 @@ export default function CreateAdPage() {
                     className="hidden"
                   />
                 </div>
+              </div>
+
+              <div className="space-y-3">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={formData.commissionEnabled}
+                    onChange={(e) => setFormData(p => ({ ...p, commissionEnabled: e.target.checked }))}
+                    className="rounded border-slate-600 bg-slate-700/50 text-violet-500 focus:ring-violet-500/50"
+                  />
+                  <span className="text-sm font-medium text-slate-300">Enable commission (e.g. 2% if you sell this)</span>
+                </label>
+                {formData.commissionEnabled && (
+                  <input
+                    type="text"
+                    maxLength={200}
+                    placeholder="e.g. 2% commission if you sell this property"
+                    value={formData.commissionNote}
+                    onChange={(e) => setFormData(p => ({ ...p, commissionNote: e.target.value }))}
+                    className="w-full px-4 py-4 bg-slate-700/50 border border-slate-600/50 rounded-2xl text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-violet-500/50 focus:border-violet-500/50 transition-all duration-200"
+                  />
+                )}
               </div>
 
               <div className="grid grid-cols-2 gap-4">

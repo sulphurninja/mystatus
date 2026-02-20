@@ -34,6 +34,8 @@ export async function GET(request: NextRequest) {
         totalVerifiedShares: ad.totalVerifiedShares,
         totalRewardsPaid: ad.totalRewardsPaid,
         verificationPeriodHours: ad.verificationPeriodHours,
+        commissionEnabled: !!ad.commissionEnabled,
+        commissionNote: ad.commissionNote || '',
         createdAt: ad.createdAt
       }))
     });
@@ -65,7 +67,9 @@ export async function POST(request: NextRequest) {
       image,
       rewardAmount,
       vendorId,
-      verificationPeriodHours
+      verificationPeriodHours,
+      commissionEnabled,
+      commissionNote
     } = await request.json();
 
     // Validate required fields
@@ -92,7 +96,9 @@ export async function POST(request: NextRequest) {
       image,
       rewardAmount: parseFloat(rewardAmount),
       vendor: vendorId,
-      verificationPeriodHours: verificationPeriodHours !== undefined ? parseInt(verificationPeriodHours) : 8
+      verificationPeriodHours: verificationPeriodHours !== undefined ? parseInt(verificationPeriodHours) : 8,
+      commissionEnabled: !!commissionEnabled,
+      commissionNote: commissionNote ? String(commissionNote).trim().slice(0, 200) : ''
     });
 
     // Update vendor's totalAds count
@@ -116,6 +122,8 @@ export async function POST(request: NextRequest) {
         totalVerifiedShares: populatedAd!.totalVerifiedShares,
         totalRewardsPaid: populatedAd!.totalRewardsPaid,
         verificationPeriodHours: populatedAd!.verificationPeriodHours,
+        commissionEnabled: !!populatedAd!.commissionEnabled,
+        commissionNote: populatedAd!.commissionNote || '',
         createdAt: populatedAd!.createdAt
       }
     });

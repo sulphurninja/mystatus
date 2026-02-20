@@ -11,6 +11,8 @@ export interface IAdvertisement extends Document {
   totalVerifiedShares: number;
   totalRewardsPaid: number;
   verificationPeriodHours: number;
+  commissionEnabled?: boolean;
+  commissionNote?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -62,7 +64,9 @@ const AdvertisementSchema: Schema = new Schema({
     default: 8,
     min: 0,
     max: 24
-  }
+  },
+  commissionEnabled: { type: Boolean, default: false },
+  commissionNote: { type: String, default: '', maxlength: [200, 'Commission note cannot exceed 200 characters'] }
 }, {
   timestamps: true
 });
