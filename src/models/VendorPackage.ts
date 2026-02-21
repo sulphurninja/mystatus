@@ -6,7 +6,9 @@ export interface IVendorPackage extends Document {
   adsAllotted: number;
   adsUsed: number;
   price: number;
+  purchasedBy?: mongoose.Types.ObjectId;
   assignedBy: string;
+  activationStatus: 'pending_approval' | 'active' | 'cancelled';
   status: 'active' | 'expired' | 'exhausted';
   createdAt: Date;
   updatedAt: Date;
@@ -38,9 +40,18 @@ const VendorPackageSchema: Schema = new Schema({
     required: true,
     min: 0
   },
+  purchasedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
+  },
   assignedBy: {
     type: String,
     default: 'admin'
+  },
+  activationStatus: {
+    type: String,
+    enum: ['pending_approval', 'active', 'cancelled'],
+    default: 'pending_approval'
   },
   status: {
     type: String,
