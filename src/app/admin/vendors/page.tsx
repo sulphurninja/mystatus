@@ -14,6 +14,7 @@ interface Vendor {
   totalAds: number;
   totalShares: number;
   totalEarnings: number;
+  status?: 'pending' | 'active' | 'rejected';
   isActive: boolean;
   createdAt: string;
 }
@@ -43,6 +44,11 @@ export default function VendorsPage() {
     businessName: '',
     phone: ''
   });
+  const [statusLoading, setStatusLoading] = useState<string | null>(null);
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [passwordVendor, setPasswordVendor] = useState<Vendor | null>(null);
+  const [newPassword, setNewPassword] = useState('');
+  const [passwordSaving, setPasswordSaving] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -159,6 +165,70 @@ export default function VendorsPage() {
         ? { ...vendor, isActive: !vendor.isActive }
         : vendor
     ));
+  };
+
+  const updateVendorStatus = async (vendorId: string, status: 'active' | 'rejected') => {
+    try {
+      setStatusLoading(vendorId);
+      const res = await fetch('/api/admin/vendors/status', {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          ...getAuthHeaders(),
+        },
+        body: JSON.stringify({ vendorId, status }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setVendors(prev => prev.map(v =>
+          v._id === vendorId
+            ? { ...v, status, isActive: status === 'active' }
+            : v
+        ));
+      } else {
+        console.error('Status update failed:', data.message);
+      }
+    } catch (e) {
+      console.error('Status update error:', e);
+    } finally {
+      setStatusLoading(null);
+    }
+  };
+
+  const openPasswordModal = (vendor: Vendor) => {
+    setPasswordVendor(vendor);
+    setNewPassword('');
+    setShowPasswordModal(true);
+  };
+
+  const saveVendorPassword = async () => {
+    if (!passwordVendor || newPassword.length < 6) {
+      alert('Password must be at least 6 characters');
+      return;
+    }
+    setPasswordSaving(true);
+    try {
+      const res = await fetch(`/api/admin/vendors/${passwordVendor._id}/reset-password`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...getAuthHeaders(),
+        },
+        body: JSON.stringify({ password: newPassword }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        alert(data.message || 'Failed to set password');
+      } else {
+        alert('Password updated');
+        setShowPasswordModal(false);
+      }
+    } catch (e) {
+      console.error('Password update error:', e);
+      alert('Error updating password');
+    } finally {
+      setPasswordSaving(false);
+    }
   };
 
   return (
@@ -334,11 +404,13 @@ export default function VendorsPage() {
                       </td>
                       <td className="px-6 py-4">
                         <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                          vendor.isActive
+                          vendor.status === 'active'
                             ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
-                            : 'bg-red-500/20 text-red-300 border border-red-500/30'
+                            : vendor.status === 'pending'
+                              ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                              : 'bg-red-500/20 text-red-300 border border-red-500/30'
                         }`}>
-                          {vendor.isActive ? 'Active' : 'Inactive'}
+                          {vendor.status ? vendor.status.charAt(0).toUpperCase() + vendor.status.slice(1) : (vendor.isActive ? 'Active' : 'Inactive')}
                         </span>
                       </td>
                       <td className="px-6 py-4">
@@ -350,21 +422,84 @@ export default function VendorsPage() {
                             Assign Package
                           </button>
                           <button
-                            onClick={() => toggleVendorStatus(vendor._id)}
-                            className={`px-3 py-1 rounded-lg text-xs font-medium transition-all duration-200 ${
-                              vendor.isActive
-                                ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30 border border-red-500/30'
-                                : 'bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 border border-emerald-500/30'
-                            }`}
+                            onClick={() => openPasswordModal(vendor)}
+                            className="px-3 py-1 bg-slate-700/40 text-slate-200 hover:bg-slate-600/50 border border-slate-600/50 rounded-lg text-xs font-medium transition-all duration-200"
                           >
-                            {vendor.isActive ? 'Deactivate' : 'Activate'}
+                            Set Password
                           </button>
+                          {vendor.status !== 'active' && (
+                            <button
+                              onClick={() => updateVendorStatus(vendor._id, 'active')}
+                              disabled={statusLoading === vendor._id}
+                              className="px-3 py-1 bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 border border-emerald-500/30 rounded-lg text-xs font-medium transition-all duration-200 disabled:opacity-50"
+                            >
+                              {statusLoading === vendor._id ? 'Approving...' : 'Approve'}
+                            </button>
+                          )}
+                          {vendor.status !== 'rejected' && (
+                            <button
+                              onClick={() => updateVendorStatus(vendor._id, 'rejected')}
+                              disabled={statusLoading === vendor._id}
+                              className="px-3 py-1 bg-red-500/20 text-red-400 hover:bg-red-500/30 border border-red-500/30 rounded-lg text-xs font-medium transition-all duration-200 disabled:opacity-50"
+                            >
+                              {statusLoading === vendor._id ? 'Saving...' : 'Reject'}
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Set Password Modal */}
+      {showPasswordModal && passwordVendor && (
+        <div className="fixed inset-0 backdrop-blur-sm bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-gradient-to-br from-slate-800/95 to-slate-900/95 backdrop-blur-xl rounded-3xl max-w-md w-full border border-slate-700/50 shadow-2xl p-8 space-y-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-2xl font-bold text-slate-100">Set Vendor Password</h3>
+                <p className="text-slate-400 text-sm">for {passwordVendor.name} ({passwordVendor.businessName})</p>
+              </div>
+              <button
+                onClick={() => setShowPasswordModal(false)}
+                className="w-8 h-8 bg-slate-700/50 hover:bg-slate-600/50 rounded-xl flex items-center justify-center transition"
+              >
+                <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              <label className="text-sm font-medium text-slate-300">New Password (min 6 chars)</label>
+              <input
+                type="password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                className="w-full px-4 py-3 bg-slate-800/50 border border-slate-700/60 rounded-xl text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-violet-500/40"
+                placeholder="Enter new password"
+              />
+            </div>
+
+            <div className="flex gap-3 pt-2">
+              <button
+                onClick={() => setShowPasswordModal(false)}
+                className="flex-1 py-3 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl border border-slate-700"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={saveVendorPassword}
+                disabled={passwordSaving}
+                className="flex-1 py-3 bg-gradient-to-r from-violet-500 to-purple-600 text-white rounded-xl font-semibold disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {passwordSaving ? 'Saving...' : 'Save Password'}
+              </button>
             </div>
           </div>
         </div>

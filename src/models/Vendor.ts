@@ -11,6 +11,7 @@ export interface IVendor extends Document {
   walletBalance: number;
   adsRemaining: number;
   isActive: boolean;
+  status: 'pending' | 'active' | 'rejected';
   totalAds: number;
   totalShares: number;
   totalEarnings: number;
@@ -63,6 +64,11 @@ const VendorSchema: Schema = new Schema({
     default: 0,
     min: 0
   },
+  status: {
+    type: String,
+    enum: ['pending', 'active', 'rejected'],
+    default: 'active'
+  },
   isActive: {
     type: Boolean,
     default: true
@@ -83,14 +89,26 @@ const VendorSchema: Schema = new Schema({
   timestamps: true
 });
 
-// Hash password before saving
+// Hash password before saving (supports both callback + promise)
 VendorSchema.pre('save', async function(next) {
-  if (!this.isModified('password')) {
-    next();
+  const vendor: any = this;
+  const callNext = (err?: any) => {
+    if (typeof next === 'function') return next(err);
+    if (err) throw err;
+  };
+
+  if (!vendor.isModified('password')) {
+    return callNext();
   }
 
-  const salt = await bcrypt.genSalt(10);
-  this.password = await bcrypt.hash(this.password, salt);
+  try {
+    const salt = await bcrypt.genSalt(10);
+    vendor.password = await bcrypt.hash(vendor.password, salt);
+    console.log('[vendor model] password hashed for', vendor.email);
+    return callNext();
+  } catch (err) {
+    return callNext(err);
+  }
 });
 
 // Compare password method

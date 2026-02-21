@@ -32,6 +32,7 @@ export async function GET(request: NextRequest) {
         totalAds: vendor.totalAds,
         totalShares: vendor.totalShares,
         totalEarnings: vendor.totalEarnings,
+        status: (vendor as any).status || (vendor.isActive ? 'active' : 'pending'),
         isActive: vendor.isActive,
         createdAt: vendor.createdAt
       }))

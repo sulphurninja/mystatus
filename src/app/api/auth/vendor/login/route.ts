@@ -26,6 +26,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    if (vendor.status && vendor.status !== 'active') {
+      return NextResponse.json(
+        { success: false, message: 'Account pending approval' },
+        { status: 401 }
+      );
+    }
+
     if (!vendor.isActive) {
       return NextResponse.json(
         { success: false, message: 'Account is deactivated' },

@@ -35,6 +35,13 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       );
     }
 
+    if (vendor.status && vendor.status !== 'active') {
+      return NextResponse.json(
+        { success: false, message: 'Vendor is not active. Approve vendor before assigning packages.' },
+        { status: 400 }
+      );
+    }
+
     const pkg = await Package.findById(packageId);
     if (!pkg || !pkg.isActive) {
       return NextResponse.json(
