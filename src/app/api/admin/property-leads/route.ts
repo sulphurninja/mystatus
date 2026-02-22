@@ -1,0 +1,143 @@
+import { NextRequest, NextResponse } from 'next/server';
+import connectToDatabase from '@/lib/mongodb';
+import PropertyLead from '@/models/PropertyLead';
+import LoanApplication from '@/models/LoanApplication';
+import { authenticateRequest } from '@/middleware/auth';
+
+export async function GET(request: NextRequest) {
+  try {
+    const auth = authenticateRequest(request, ['admin']);
+    if (auth.error) {
+      return NextResponse.json(
+        { success: false, message: auth.error.message },
+        { status: auth.error.status }
+      );
+    }
+
+    await connectToDatabase();
+
+    const { searchParams } = new URL(request.url);
+    const search = (searchParams.get('search') || '').trim();
+
+    const searchQuery: any = {};
+    if (search) {
+      searchQuery.$or = [
+        { name: { $regex: search, $options: 'i' } },
+        { contactNumber: { $regex: search, $options: 'i' } },
+        { referralCode: { $regex: search, $options: 'i' } },
+      ];
+    }
+
+    const leads = await PropertyLead.find(searchQuery)
+      .populate('property', 'title')
+      .sort({ createdAt: -1 });
+
+    const leadPairs = leads
+      .map((lead: any) => ({
+        email: lead.email,
+        contactNumber: lead.contactNumber
+      }))
+      .filter((pair: any) => pair.email && pair.contactNumber);
+
+    const loanMap = new Map<string, any>();
+    if (leadPairs.length > 0) {
+      const loanDocs = await LoanApplication.find({
+        $or: leadPairs.map((pair: any) => ({
+          email: pair.email,
+          contactNumber: pair.contactNumber
+        }))
+      }).select('email contactNumber pan aadhaar panCardUrl aadhaarCardUrl bankStatementUrl createdAt');
+
+      loanDocs.forEach((doc: any) => {
+        const key = `${doc.email}|${doc.contactNumber}`;
+        loanMap.set(key, doc);
+      });
+    }
+
+    return NextResponse.json({
+      success: true,
+      leads: leads.map((lead: any) => ({
+        _id: lead._id,
+        name: lead.name,
+        contactNumber: lead.contactNumber,
+        email: lead.email,
+        address: lead.address,
+        requiresLoan: !!lead.requiresLoan,
+        referralCode: lead.referralCode || '',
+        property: lead.property
+          ? { _id: lead.property._id, title: lead.property.title }
+          : null,
+        createdAt: lead.createdAt,
+        loan: (() => {
+          const key = `${lead.email}|${lead.contactNumber}`;
+          const match = loanMap.get(key);
+          if (!match) return null;
+          return {
+            pan: match.pan,
+            aadhaar: match.aadhaar,
+            panCardUrl: match.panCardUrl,
+            aadhaarCardUrl: match.aadhaarCardUrl,
+            bankStatementUrl: match.bankStatementUrl,
+            createdAt: match.createdAt
+          };
+        })()
+      }))
+    });
+  } catch (error: any) {
+    console.error('Get property leads error:', error);
+    return NextResponse.json(
+      { success: false, message: 'Server error', error: error.message },
+      { status: 500 }
+    );
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const auth = authenticateRequest(request, ['admin']);
+    if (auth.error) {
+      return NextResponse.json(
+        { success: false, message: auth.error.message },
+        { status: auth.error.status }
+      );
+    }
+
+    await connectToDatabase();
+
+    const { searchParams } = new URL(request.url);
+    const leadId = (searchParams.get('id') || '').trim();
+
+    if (!leadId) {
+      return NextResponse.json(
+        { success: false, message: 'Lead ID is required' },
+        { status: 400 }
+      );
+    }
+
+    if (!leadId.match(/^[0-9a-fA-F]{24}$/)) {
+      return NextResponse.json(
+        { success: false, message: 'Invalid lead ID format' },
+        { status: 400 }
+      );
+    }
+
+    const deleted = await PropertyLead.findByIdAndDelete(leadId);
+    if (!deleted) {
+      return NextResponse.json(
+        { success: false, message: 'Lead not found' },
+        { status: 404 }
+      );
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: 'Lead deleted successfully'
+    });
+  } catch (error: any) {
+    console.error('Delete property lead error:', error);
+    return NextResponse.json(
+      { success: false, message: 'Server error', error: error.message },
+      { status: 500 }
+    );
+  }
+}

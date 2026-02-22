@@ -29,9 +29,16 @@ interface Ad {
   commissionNote?: string;
 }
 
+const slugify = (value: string) =>
+  value
+    .toLowerCase()
+    .normalize('NFKD')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/(^-|-$)/g, '');
+
 export default function ShareAdPage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = use(params);
-  const { token } = useAuth();
+  const { token, user } = useAuth();
   const router = useRouter();
   const [ad, setAd] = useState<Ad | null>(null);
   const [share, setShare] = useState<any>(null);
@@ -41,10 +48,20 @@ export default function ShareAdPage({ params }: { params: Promise<{ id: string }
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string>('');
   const [fileType, setFileType] = useState<'image' | 'video'>('image');
+  const [shareUrl, setShareUrl] = useState('');
+  const [isCopied, setIsCopied] = useState(false);
 
   useEffect(() => {
     fetchAdAndCreateShare();
   }, [resolvedParams.id, token]);
+
+  useEffect(() => {
+    if (!ad || typeof window === 'undefined') return;
+    const baseUrl = window.location.origin;
+    const slug = slugify(ad.title) || ad._id;
+    const referral = user?.referralCode ? `?ref=${encodeURIComponent(user.referralCode)}` : '';
+    setShareUrl(`${baseUrl}/property/${encodeURIComponent(slug)}${referral}`);
+  }, [ad, user?.referralCode]);
 
   const fetchAdAndCreateShare = async () => {
     try {
@@ -183,33 +200,38 @@ export default function ShareAdPage({ params }: { params: Promise<{ id: string }
 
   const handleShareToWhatsApp = async () => {
     try {
-      const response = await fetch(`/api/ad-image/${ad._id}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to load image');
+      if (!shareUrl) {
+        alert('Share link is not ready yet. Please try again.');
+        return;
       }
-
-      const blob = await response.blob();
-      const contentType = response.headers.get('content-type') || 'image/jpeg';
-      const file = new File([blob], `${ad.title.replace(/[^a-z0-9]/gi, '_')}.jpg`, {
-        type: blob.type || contentType,
-      });
-
-      const downloadUrl = URL.createObjectURL(file);
-      const a = document.createElement('a');
-      a.href = downloadUrl;
-      a.download = `${ad.title.replace(/[^a-z0-9]/gi, '_')}.jpg`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(downloadUrl);
-
-      alert('Image downloaded! Now open WhatsApp → Status → share this image from your gallery to earn rewards. 💰');
+      const message = `Check out ${ad.title}\n${shareUrl}`;
+      const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(message)}`;
+      window.open(whatsappUrl, '_blank', 'noopener,noreferrer');
     } catch (error) {
       console.error('Share error:', error);
-      alert('Could not download image. Please try again.');
+      alert('Could not open WhatsApp. Please try again.');
+    }
+  };
+
+  const handleCopyLink = async () => {
+    if (!shareUrl) return;
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      setIsCopied(true);
+      setTimeout(() => setIsCopied(false), 2000);
+    } catch (error) {
+      console.error('Copy error:', error);
+      const tempInput = document.createElement('textarea');
+      tempInput.value = shareUrl;
+      tempInput.setAttribute('readonly', 'true');
+      tempInput.style.position = 'absolute';
+      tempInput.style.left = '-9999px';
+      document.body.appendChild(tempInput);
+      tempInput.select();
+      document.execCommand('copy');
+      document.body.removeChild(tempInput);
+      setIsCopied(true);
+      setTimeout(() => setIsCopied(false), 2000);
     }
   };
 
@@ -360,6 +382,27 @@ export default function ShareAdPage({ params }: { params: Promise<{ id: string }
                 <span className="text-sm text-amber-200/90">{ad.commissionNote}</span>
               </div>
             )}
+            {shareUrl && (
+              <div className="mb-3 rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-3">
+                <p className="text-xs font-semibold uppercase tracking-wider text-emerald-300/80 mb-2">Share Link</p>
+                <div className="flex items-center gap-2">
+                  <input
+                    value={shareUrl}
+                    readOnly
+                    onFocus={(event) => event.currentTarget.select()}
+                    className="flex-1 rounded-lg border border-slate-700 bg-slate-950/60 px-3 py-2 text-xs text-slate-200"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleCopyLink}
+                    className="rounded-lg bg-emerald-500/20 px-3 py-2 text-xs font-semibold text-emerald-200 hover:bg-emerald-500/30 transition"
+                  >
+                    {isCopied ? 'Copied' : 'Copy'}
+                  </button>
+                </div>
+                <p className="mt-2 text-xs text-slate-500">Tap the link to select and share.</p>
+              </div>
+            )}
             <div className="flex items-center justify-between">
               <span className="text-sm text-slate-400">Reward</span>
               <CoinAmount amount={ad.reward} size="md" />
@@ -377,10 +420,10 @@ export default function ShareAdPage({ params }: { params: Promise<{ id: string }
               <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
                 <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/>
               </svg>
-              Share to WhatsApp
+              Share Link to WhatsApp
             </button>
             <p className="text-xs text-slate-400 text-center mt-3">
-              Share the ad image to your WhatsApp Status, then upload proof below
+              Share the link on WhatsApp, then upload proof below
             </p>
           </div>
         )}
@@ -424,11 +467,11 @@ export default function ShareAdPage({ params }: { params: Promise<{ id: string }
               <div className="space-y-2 text-sm text-slate-400">
                 <p className="flex gap-2">
                   <span className="text-emerald-400 font-bold">1.</span>
-                  Download the ad image and share it to your WhatsApp status
+                  Copy the share link and post it on WhatsApp
                 </p>
                 <p className="flex gap-2">
                   <span className="text-emerald-400 font-bold">2.</span>
-                  Take a screenshot or screen recording as proof
+                  Take a screenshot of the shared link as proof
                 </p>
                 <p className="flex gap-2">
                   <span className="text-emerald-400 font-bold">3.</span>
@@ -563,3 +606,4 @@ export default function ShareAdPage({ params }: { params: Promise<{ id: string }
     </div>
   );
 }
+

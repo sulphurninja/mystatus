@@ -13,6 +13,8 @@ import './WithdrawalRequest';
 import './KeyTier';
 import './Package';
 import './VendorPackage';
+import './PropertyLead';
+import './LoanApplication';
 
 export {};
 

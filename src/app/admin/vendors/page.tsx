@@ -232,7 +232,8 @@ export default function VendorsPage() {
   };
 
   return (
-    <div className="p-6 lg:p-8 space-y-8">
+    <div className="w-full">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pb-10 space-y-8 overflow-hidden">
       {/* Header */}
       <div className="space-y-2">
         <div className="flex items-center space-x-3">
@@ -349,7 +350,7 @@ export default function VendorsPage() {
           {/* Vendors Table */}
           <div className="bg-gradient-to-br from-slate-800/50 to-slate-900/50 backdrop-blur-xl rounded-2xl border border-slate-700/50 overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="min-w-full text-left text-sm text-slate-200">
+              <table className="min-w-full text-left text-sm text-slate-200 table-auto">
                 <thead className="bg-slate-800/80 text-slate-300">
                   <tr>
                     <th className="px-6 py-4 font-semibold">Vendor</th>
@@ -414,7 +415,7 @@ export default function VendorsPage() {
                         </span>
                       </td>
                       <td className="px-6 py-4">
-                        <div className="flex items-center space-x-2">
+                        <div className="flex flex-wrap gap-2">
                           <button
                             onClick={() => openAssignModal(vendor)}
                             className="px-3 py-1 bg-violet-500/20 text-violet-400 hover:bg-violet-500/30 rounded-lg text-xs font-medium transition-all duration-200 border border-violet-500/30"
@@ -758,6 +759,7 @@ export default function VendorsPage() {
           </div>
         </div>
       )}
+    </div>
     </div>
   );
 }
