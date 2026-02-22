@@ -9,7 +9,7 @@ import { Search, X } from 'lucide-react';
 import Link from 'next/link';
 
 export default function DiscoverPage() {
-  const { token } = useAuth();
+  const { token, user } = useAuth();
   const [ads, setAds] = useState<any[]>([]);
   const [filteredAds, setFilteredAds] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -180,7 +180,11 @@ export default function DiscoverPage() {
             </div>
           ) : (
             filteredAds.map((ad) => (
-              <AdCard key={ad._id} ad={ad} onClick={() => setSelectedAd(ad)} />
+              <AdCard
+                key={ad._id}
+                ad={ad}
+                onClick={() => setSelectedAd(ad)}
+              />
             ))
           )}
         </div>
