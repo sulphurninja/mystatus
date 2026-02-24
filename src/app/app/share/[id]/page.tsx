@@ -204,7 +204,14 @@ export default function ShareAdPage({ params }: { params: Promise<{ id: string }
         alert('Share link is not ready yet. Please try again.');
         return;
       }
-      const message = `Check out ${ad.title}\n${shareUrl}`;
+      const baseUrl = window.location.origin;
+      const registerLink = `${baseUrl}/app/register${user?.referralCode ? `?ref=${encodeURIComponent(user.referralCode)}` : ''}`;
+      const messageLines = [
+        `Check out ${ad.title}`,
+        `Ad Link -> ${shareUrl}`,
+        `Register Link -> ${registerLink}`,
+      ];
+      const message = messageLines.join('\n');
       const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(message)}`;
       window.open(whatsappUrl, '_blank', 'noopener,noreferrer');
     } catch (error) {
@@ -606,4 +613,3 @@ export default function ShareAdPage({ params }: { params: Promise<{ id: string }
     </div>
   );
 }
-
