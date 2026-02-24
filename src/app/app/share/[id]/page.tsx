@@ -200,15 +200,16 @@ export default function ShareAdPage({ params }: { params: Promise<{ id: string }
 
   const handleShareToWhatsApp = async () => {
     try {
-      if (!shareUrl) {
+      if (!shareUrl || !ad?._id) {
         alert('Share link is not ready yet. Please try again.');
         return;
       }
       const baseUrl = window.location.origin;
-      const registerLink = `${baseUrl}/app/register${user?.referralCode ? `?ref=${encodeURIComponent(user.referralCode)}` : ''}`;
+      const adLink = `${baseUrl}/app/share/${encodeURIComponent(ad._id)}`;
+      const registerLink = shareUrl;
       const messageLines = [
         `Check out ${ad.title}`,
-        `Ad Link -> ${shareUrl}`,
+        `Ad Link -> ${adLink}`,
         `Register Link -> ${registerLink}`,
       ];
       const message = messageLines.join('\n');

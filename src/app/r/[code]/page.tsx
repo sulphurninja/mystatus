@@ -5,6 +5,9 @@ interface Props {
   params: Promise<{ code: string }>;
 }
 
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://mystatusads.com';
+const defaultOgImage = new URL('/mystatus.jpeg', siteUrl).toString();
+
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { code } = await params;
   
@@ -15,6 +18,20 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       title: `Join MyStatus with code ${code}`,
       description: 'Join MyStatus and start earning by sharing advertisements! Download the app now.',
       type: 'website',
+      url: new URL(`/r/${code}`, siteUrl).toString(),
+      siteName: 'MyStatus',
+      images: [
+        {
+          url: defaultOgImage,
+          alt: 'MyStatus',
+        },
+      ],
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title: `Join MyStatus with code ${code}`,
+      description: 'Join MyStatus and start earning by sharing advertisements! Download the app now.',
+      images: [defaultOgImage],
     },
   };
 }
