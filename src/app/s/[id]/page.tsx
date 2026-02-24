@@ -7,6 +7,15 @@ interface Props {
   params: Promise<{ id: string }>;
 }
 
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://mystatusads.com';
+const defaultOgImage = new URL('/mystatus.jpeg', siteUrl).toString();
+
+const toAbsoluteUrl = (url?: string) => {
+  if (!url) return defaultOgImage;
+  if (url.startsWith('http://') || url.startsWith('https://')) return url;
+  return new URL(url, siteUrl).toString();
+};
+
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id } = await params;
   
@@ -23,8 +32,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       };
     }
     
-    const imageUrl = advertisement.image || '';
-    const siteUrl = 'https://mystatusads.com';
+    const imageUrl = toAbsoluteUrl(advertisement.image);
+    const shareUrl = new URL(`/s/${id}`, siteUrl).toString();
     
     return {
       title: advertisement.title,
@@ -35,13 +44,11 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
         images: [
           {
             url: imageUrl,
-            width: 1200,
-            height: 630,
             alt: advertisement.title,
           },
         ],
         type: 'website',
-        url: `${siteUrl}/s/${id}`,
+        url: shareUrl,
       },
       twitter: {
         card: 'summary_large_image',

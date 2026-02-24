@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import AppHeader from '@/components/app/AppHeader';
 import CoinAmount from '@/components/app/CoinAmount';
@@ -19,18 +20,65 @@ import {
   Shield,
   Camera,
   Award,
+  Star,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
 export default function ProfilePage() {
-  const { user, logout } = useAuth();
+  const { user, logout, token } = useAuth();
   const router = useRouter();
+  const [referralStats, setReferralStats] = useState({ total: 0, active: 0 });
 
   const handleLogout = () => {
     logout();
     router.replace('/app/login');
   };
+
+  useEffect(() => {
+    if (!token) return;
+    let isMounted = true;
+
+    const loadReferralStats = async () => {
+      try {
+        const response = await fetch('/api/users/referral', {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+
+        if (!response.ok) return;
+
+        const result = await response.json();
+        const total = Number(
+          result?.data?.stats?.totalReferrals ?? result?.data?.totalReferrals ?? 0
+        );
+        const active = Number(
+          result?.data?.stats?.activeReferrals ?? result?.data?.activeReferrals ?? 0
+        );
+
+        if (isMounted) {
+          setReferralStats({
+            total: Number.isFinite(total) ? total : 0,
+            active: Number.isFinite(active) ? active : 0,
+          });
+        }
+      } catch (error) {
+        console.error('Failed to load referral stats:', error);
+      }
+    };
+
+    loadReferralStats();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [token]);
+
+  const totalStars = 7;
+  // 1 base star for every account + 1 bonus star if they have at least 1 referral
+  const brightStars = Math.min(
+    totalStars,
+    1 + (referralStats.total > 0 ? 1 : 0)
+  );
 
   const menuSections = [
     {
@@ -149,6 +197,18 @@ export default function ProfilePage() {
               <div className="flex-1">
                 <h2 className="text-xl font-bold text-slate-100 mb-1">{user?.name}</h2>
                 <p className="text-sm text-slate-400 mb-2">{user?.email}</p>
+                <div className="flex items-center gap-1 mb-2">
+                  {Array.from({ length: totalStars }).map((_, index) => {
+                    const isBright = index < brightStars;
+                    return (
+                      <Star
+                        key={`referral-star-${index}`}
+                        className={`w-4 h-4 ${isBright ? 'text-amber-400' : 'text-slate-600'}`}
+                        fill={isBright ? 'currentColor' : 'none'}
+                      />
+                    );
+                  })}
+                </div>
                 <div className="flex items-center gap-2">
                   <div className="px-2.5 py-1 bg-emerald-500/20 border border-emerald-500/30 rounded-lg">
                     <p className="text-xs font-semibold text-emerald-400">
@@ -181,7 +241,7 @@ export default function ProfilePage() {
               </div>
               <div className="bg-slate-900/50 rounded-xl p-3">
                 <p className="text-xs text-slate-400 mb-1">Referrals</p>
-                <p className="text-sm font-bold text-slate-100">0</p>
+                <p className="text-sm font-bold text-slate-100">{referralStats.total}</p>
               </div>
             </div>
 
