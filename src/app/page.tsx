@@ -78,6 +78,10 @@ export default function LandingPage() {
               <a href="https://mystatusads.com/download/mystatus.apk" className="w-full sm:w-auto bg-emerald-500 hover:bg-emerald-400 text-slate-950 px-10 py-5 rounded-2xl font-black text-xl transition-all shadow-xl shadow-emerald-500/25 active:scale-95 flex items-center justify-center gap-3">
                 Download for Android <span className="text-2xl">→</span>
               </a>
+              <a href="https://www.mystatusads.com/app/login" className="w-full sm:w-auto bg-slate-700 hover:bg-slate-600 text-white px-10 py-5 rounded-2xl font-black text-xl transition-all shadow-xl shadow-slate-700/25 active:scale-95 flex items-center justify-center gap-3">
+                Web App Login <span className="text-2xl">→</span>
+              </a>
+
               <div className="flex items-center gap-4 px-6 py-4 rounded-2xl bg-slate-800/50 border border-slate-700/50 backdrop-blur-sm">
                 <div className="text-left">
                   <p className="text-white font-bold leading-none mb-1">Platinum Tier</p>

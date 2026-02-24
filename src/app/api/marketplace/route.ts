@@ -94,7 +94,7 @@ export async function GET(request: NextRequest) {
         validityDays: 30,
         features: [
           'Required for withdrawals',
-          'Earn MLM commissions (6 levels)',
+          'Community Building Incentive',
           'Higher limits with more referrals',
           'Renewable after reaching limit'
         ],
@@ -102,7 +102,7 @@ export async function GET(request: NextRequest) {
           id: key.createdBy._id,
           name: key.createdBy.name,
           referralCode: key.createdBy.referralCode
-        } : null
+        } : null 
       }))
     });
 
