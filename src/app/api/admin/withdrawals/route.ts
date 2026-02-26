@@ -3,6 +3,7 @@ import connectToDatabase from '@/lib/mongodb';
 import WithdrawalRequest from '@/models/WithdrawalRequest';
 import User from '@/models/User';
 import { verifyToken, getTokenFromRequest } from '@/middleware/auth';
+import { calculateWithdrawalCharges } from '@/lib/withdrawalCharges';
 
 // GET - Get all withdrawal requests (admin)
 export async function GET(request: NextRequest) {
@@ -46,17 +47,26 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       success: true,
       data: {
-        requests: withdrawalRequests.map(req => ({
-          id: req._id,
-          user: req.user,
-          amount: req.amount,
-          activationKey: req.activationKey,
-          status: req.status,
-          requestedAt: req.requestedAt,
-          processedAt: req.processedAt,
-          rejectionReason: req.rejectionReason,
-          paymentDetails: req.paymentDetails
-        })),
+        requests: withdrawalRequests.map(req => {
+          const computed = calculateWithdrawalCharges(req.amount);
+          return {
+            id: req._id,
+            user: req.user,
+            amount: req.amount,
+            tdsRate: req.tdsRate ?? computed.tdsRate,
+            adminRate: req.adminRate ?? computed.adminRate,
+            tdsAmount: req.tdsAmount ?? computed.tdsAmount,
+            adminCharge: req.adminCharge ?? computed.adminAmount,
+            totalDeduction: req.totalDeduction ?? computed.totalDeduction,
+            netAmount: req.netAmount ?? computed.netAmount,
+            activationKey: req.activationKey,
+            status: req.status,
+            requestedAt: req.requestedAt,
+            processedAt: req.processedAt,
+            rejectionReason: req.rejectionReason,
+            paymentDetails: req.paymentDetails
+          };
+        }),
         pagination: {
           page,
           limit,
@@ -78,4 +88,3 @@ export async function GET(request: NextRequest) {
     );
   }
 }
-

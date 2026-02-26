@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import AppHeader from '@/components/app/AppHeader';
 import CoinAmount from '@/components/app/CoinAmount';
+import { calculateWithdrawalCharges } from '@/lib/withdrawalCharges';
 import {
   Wallet,
   ArrowUpRight,
@@ -15,11 +16,15 @@ import {
   AlertCircle,
 } from 'lucide-react';
 
+const MIN_WITHDRAWAL_AMOUNT = 2500;
+
 export default function WalletPage() {
   const { user, token, refreshUserProfile } = useAuth();
   const [withdrawalRequests, setWithdrawalRequests] = useState<any[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [withdrawalAmount, setWithdrawalAmount] = useState('');
+  const [withdrawalAmount, setWithdrawalAmount] = useState(
+    String(MIN_WITHDRAWAL_AMOUNT)
+  );
   const [showWithdrawModal, setShowWithdrawModal] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
@@ -79,8 +84,13 @@ export default function WalletPage() {
     setError('');
     const amount = parseFloat(withdrawalAmount);
 
-    if (!amount || amount <= 0) {
+    if (!Number.isFinite(amount) || amount <= 0) {
       setError('Please enter a valid amount');
+      return;
+    }
+
+    if (amount < MIN_WITHDRAWAL_AMOUNT) {
+      setError(`Minimum withdrawal amount is ₹${MIN_WITHDRAWAL_AMOUNT}`);
       return;
     }
 
@@ -106,17 +116,28 @@ export default function WalletPage() {
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || 'Withdrawal failed');
+        throw new Error(
+          errorData.message || errorData.error || 'Withdrawal failed'
+        );
       }
 
       await refreshUserProfile();
       await fetchWalletData();
       setShowWithdrawModal(false);
-      setWithdrawalAmount('');
+      setWithdrawalAmount(String(MIN_WITHDRAWAL_AMOUNT));
     } catch (err: any) {
       setError(err.message);
     }
   };
+
+  const parsedAmount = Number.parseFloat(withdrawalAmount);
+  const {
+    gross: effectiveAmount,
+    tdsAmount,
+    adminAmount,
+    totalDeduction,
+    netAmount
+  } = calculateWithdrawalCharges(parsedAmount);
 
   if (isLoading) {
     return (
@@ -174,11 +195,21 @@ export default function WalletPage() {
 
             {/* Action Button */}
             <button
-              onClick={() => setShowWithdrawModal(true)}
-              disabled={needsKeyRenewal || (user?.balance || 0) <= 0}
+              onClick={() => {
+                setError('');
+                setWithdrawalAmount(String(MIN_WITHDRAWAL_AMOUNT));
+                setShowWithdrawModal(true);
+              }}
+              disabled={
+                needsKeyRenewal || (user?.balance || 0) < MIN_WITHDRAWAL_AMOUNT
+              }
               className="w-full mt-4 py-3.5 bg-emerald-500 hover:bg-emerald-600 disabled:bg-slate-700 disabled:text-slate-500 disabled:cursor-not-allowed text-white font-semibold rounded-xl transition-all"
             >
-              {needsKeyRenewal ? 'Renew Key to Withdraw' : 'Withdraw Funds'}
+              {needsKeyRenewal
+                ? 'Renew Key to Withdraw'
+                : (user?.balance || 0) < MIN_WITHDRAWAL_AMOUNT
+                  ? `Minimum ₹${MIN_WITHDRAWAL_AMOUNT} to Withdraw`
+                  : 'Withdraw Funds'}
             </button>
           </div>
         </div>
@@ -259,11 +290,11 @@ export default function WalletPage() {
       {/* Withdraw Modal */}
       {showWithdrawModal && (
         <div
-          className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-end justify-center"
+          className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[60] flex items-end justify-center"
           onClick={() => setShowWithdrawModal(false)}
         >
           <div
-            className="bg-slate-900 w-full max-w-md rounded-t-3xl p-6 animate-slide-up"
+            className="bg-slate-900 w-full max-w-md rounded-t-3xl p-6 safe-bottom animate-slide-up max-h-[85vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="w-12 h-1.5 bg-slate-700 rounded-full mx-auto mb-6"></div>
@@ -281,13 +312,51 @@ export default function WalletPage() {
                 type="number"
                 value={withdrawalAmount}
                 onChange={(e) => setWithdrawalAmount(e.target.value)}
-                placeholder="0.00"
+                placeholder={`${MIN_WITHDRAWAL_AMOUNT}.00`}
                 className="w-full px-4 py-3.5 bg-slate-800/50 border border-slate-700/50 rounded-2xl text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-transparent transition-all"
                 max={user?.balance || 0}
+                min={MIN_WITHDRAWAL_AMOUNT}
                 step="0.01"
               />
               <p className="text-xs text-slate-500 mt-2">
                 Available: ₹{(user?.balance || 0).toFixed(2)}
+              </p>
+              <p className="text-xs text-slate-500 mt-1">
+                Minimum: ₹{MIN_WITHDRAWAL_AMOUNT.toFixed(2)}
+              </p>
+            </div>
+
+            <div className="mb-4 rounded-2xl border border-slate-800/70 bg-slate-800/30 p-4">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-slate-400">Requested Amount</span>
+                <span className="text-slate-200 font-semibold">
+                  {'\u20B9'}{effectiveAmount.toFixed(2)}
+                </span>
+              </div>
+              <div className="mt-3 space-y-2 text-sm">
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-400">TDS (10%)</span>
+                  <span className="text-slate-200">
+                    {'\u20B9'}{tdsAmount.toFixed(2)}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-400">Admin Charges (5%)</span>
+                  <span className="text-slate-200">
+                    {'\u20B9'}{adminAmount.toFixed(2)}
+                  </span>
+                </div>
+                <div className="mt-2 flex items-center justify-between border-t border-slate-700/60 pt-2">
+                  <span className="text-slate-200 font-semibold">
+                    Net Amount You&apos;ll Receive
+                  </span>
+                  <span className="text-emerald-400 font-bold">
+                    {'\u20B9'}{netAmount.toFixed(2)}
+                  </span>
+                </div>
+              </div>
+              <p className="text-xs text-slate-500 mt-2">
+                Total deduction: {'\u20B9'}{totalDeduction.toFixed(2)} (10% TDS + 5% Admin)
               </p>
             </div>
 
@@ -297,23 +366,25 @@ export default function WalletPage() {
               </div>
             )}
 
-            <div className="flex gap-3">
-              <button
-                onClick={() => {
-                  setShowWithdrawModal(false);
-                  setError('');
-                  setWithdrawalAmount('');
-                }}
-                className="flex-1 py-3.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold rounded-xl transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleWithdraw}
-                className="flex-1 py-3.5 bg-gradient-to-r from-emerald-500 to-teal-600 text-white font-semibold rounded-xl"
-              >
-                Withdraw
-              </button>
+            <div className="sticky bottom-0 -mx-6 px-6 pt-3 pb-4 safe-bottom bg-slate-900/95 backdrop-blur border-t border-slate-800/60">
+              <div className="flex gap-3">
+                <button
+                  onClick={() => {
+                    setShowWithdrawModal(false);
+                    setError('');
+                    setWithdrawalAmount(String(MIN_WITHDRAWAL_AMOUNT));
+                  }}
+                  className="flex-1 py-3.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold rounded-xl transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleWithdraw}
+                  className="flex-1 py-3.5 bg-gradient-to-r from-emerald-500 to-teal-600 text-white font-semibold rounded-xl"
+                >
+                  Withdraw
+                </button>
+              </div>
             </div>
           </div>
         </div>

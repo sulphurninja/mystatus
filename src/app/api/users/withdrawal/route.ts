@@ -8,6 +8,9 @@ import Commission from '@/models/Commission';
 import KeyTier from '@/models/KeyTier';
 import { verifyToken, getTokenFromRequest } from '@/middleware/auth';
 import mongoose from 'mongoose';
+import { calculateWithdrawalCharges } from '@/lib/withdrawalCharges';
+
+const MIN_WITHDRAWAL_AMOUNT = 2500;
 
 // GET - Get user's withdrawal requests and key status
 export async function GET(request: NextRequest) {
@@ -69,6 +72,10 @@ export async function GET(request: NextRequest) {
         withdrawalRequests: withdrawalRequests.map(req => ({
           id: req._id,
           amount: req.amount,
+          netAmount: req.netAmount,
+          totalDeduction: req.totalDeduction,
+          tdsAmount: req.tdsAmount,
+          adminCharge: req.adminCharge,
           status: req.status,
           activationKey: req.activationKey,
           requestedAt: req.requestedAt,
@@ -112,9 +119,9 @@ export async function POST(request: NextRequest) {
     const { amount, activationKey, paymentDetails } = await request.json();
 
     // Validate amount
-    if (!amount || amount < 500) {
+    if (!amount || amount < MIN_WITHDRAWAL_AMOUNT) {
       return NextResponse.json(
-        { success: false, message: 'Minimum withdrawal amount is 500' },
+        { success: false, message: `Minimum withdrawal amount is ₹${MIN_WITHDRAWAL_AMOUNT}` },
         { status: 400 }
       );
     }
@@ -158,8 +165,10 @@ export async function POST(request: NextRequest) {
         );
       }
 
+      const normalizedKey = (user.activationKey || '').trim().toUpperCase();
+
       // User must have an activation key to withdraw
-      if (!user.activationKey) {
+      if (!normalizedKey) {
         await dbSession.abortTransaction();
         return NextResponse.json(
           { success: false, message: 'You need an activation key to withdraw. Please purchase one from the marketplace.' },
@@ -167,11 +176,79 @@ export async function POST(request: NextRequest) {
         );
       }
 
+      if (normalizedKey !== user.activationKey) {
+        await User.findByIdAndUpdate(
+          user._id,
+          { activationKey: normalizedKey },
+          { session: dbSession }
+        );
+      }
+
       // Get user's assigned key
-      const userKey = await ActivationKey.findOne({
-        key: user.activationKey,
+      let userKey = await ActivationKey.findOne({
+        key: normalizedKey,
         usedBy: userId
       }).session(dbSession);
+
+      // Fallback: user has a key linked but activationKey value is wrong
+      if (!userKey) {
+        const linkedKey = await ActivationKey.findOne({
+          usedBy: userId
+        }).session(dbSession);
+
+        if (linkedKey) {
+          await User.findByIdAndUpdate(
+            user._id,
+            { activationKey: linkedKey.key },
+            { session: dbSession }
+          );
+          userKey = linkedKey;
+        }
+      }
+
+      // Fallback: key exists but not linked to the user yet
+      if (!userKey) {
+        const looseKey = await ActivationKey.findOne({
+          key: normalizedKey
+        }).session(dbSession);
+
+        if (!looseKey) {
+          const createdKeys = await ActivationKey.create([{
+            key: normalizedKey,
+            isUsed: true,
+            usedBy: user._id,
+            usedAt: new Date(),
+            isForSale: false,
+            purchasedBy: user._id,
+            purchasedAt: new Date()
+          }], { session: dbSession });
+
+          userKey = await ActivationKey.findById(createdKeys[0]._id).session(dbSession);
+        } else {
+          if (looseKey.usedBy && looseKey.usedBy.toString() !== userId) {
+            await dbSession.abortTransaction();
+            return NextResponse.json(
+              { success: false, message: 'Activation key belongs to another user.' },
+              { status: 400 }
+            );
+          }
+
+          await ActivationKey.findByIdAndUpdate(
+            looseKey._id,
+            {
+              isUsed: true,
+              usedBy: user._id,
+              usedAt: looseKey.usedAt || new Date(),
+              isForSale: false,
+              purchasedBy: looseKey.purchasedBy || user._id,
+              purchasedAt: looseKey.purchasedAt || new Date()
+            },
+            { session: dbSession }
+          );
+
+          userKey = await ActivationKey.findById(looseKey._id).session(dbSession);
+        }
+      }
 
       if (!userKey) {
         await dbSession.abortTransaction();
@@ -222,10 +299,25 @@ export async function POST(request: NextRequest) {
         isPaused: shouldPause
       }, { session: dbSession });
 
+      const {
+        tdsRate,
+        adminRate,
+        tdsAmount,
+        adminAmount,
+        totalDeduction,
+        netAmount
+      } = calculateWithdrawalCharges(amount);
+
       // Create withdrawal request
       const withdrawalRequest = await WithdrawalRequest.create([{
         user: userId,
         amount,
+        tdsRate,
+        adminRate,
+        tdsAmount,
+        adminCharge: adminAmount,
+        totalDeduction,
+        netAmount,
         activationKey: keyToUse.key,
         status: 'pending',
         requestedAt: new Date(),
@@ -242,6 +334,8 @@ export async function POST(request: NextRequest) {
         data: {
           id: withdrawalRequest[0]._id,
           amount: withdrawalRequest[0].amount,
+          netAmount: withdrawalRequest[0].netAmount,
+          totalDeduction: withdrawalRequest[0].totalDeduction,
           status: withdrawalRequest[0].status,
           requestedAt: withdrawalRequest[0].requestedAt,
           keyStatus: {
@@ -356,4 +450,3 @@ async function processKeyActivationCommissions(userId: string, referrerId: strin
     // Don't throw - let the main transaction succeed even if commissions fail
   }
 }
-
