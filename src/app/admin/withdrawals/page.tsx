@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { calculateWithdrawalCharges } from '@/lib/withdrawalCharges';
 
 interface WithdrawalRequest {
   id: string;
@@ -13,6 +14,12 @@ interface WithdrawalRequest {
     walletBalance: number;
   };
   amount: number;
+  tdsRate?: number;
+  adminRate?: number;
+  tdsAmount?: number;
+  adminCharge?: number;
+  totalDeduction?: number;
+  netAmount?: number;
   activationKey: string;
   status: 'pending' | 'approved' | 'rejected';
   requestedAt: string;
@@ -122,6 +129,10 @@ export default function WithdrawalsPage() {
     return colors[status] || 'bg-slate-500/20 text-slate-400 border-slate-500/30';
   };
 
+  const selectedNetAmount = selectedRequest
+    ? (selectedRequest.netAmount ?? calculateWithdrawalCharges(selectedRequest.amount).netAmount)
+    : 0;
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
       <div className="p-6 lg:p-8">
@@ -212,7 +223,7 @@ export default function WithdrawalsPage() {
                 <thead>
                   <tr className="border-b border-slate-700/50">
                     <th className="text-left p-4 text-slate-400 font-medium">User</th>
-                    <th className="text-left p-4 text-slate-400 font-medium">Amount</th>
+                    <th className="text-left p-4 text-slate-400 font-medium">Payable Amount</th>
                     <th className="text-left p-4 text-slate-400 font-medium">Activation Key</th>
                     <th className="text-left p-4 text-slate-400 font-medium">Payment Details</th>
                     <th className="text-left p-4 text-slate-400 font-medium">Status</th>
@@ -221,7 +232,14 @@ export default function WithdrawalsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {requests.map((request) => (
+                  {requests.map((request) => {
+                    const computed = calculateWithdrawalCharges(request.amount);
+                    const netAmount = request.netAmount ?? computed.netAmount;
+                    const totalDeduction = request.totalDeduction ?? computed.totalDeduction;
+                    const tdsRate = request.tdsRate ?? computed.tdsRate;
+                    const adminRate = request.adminRate ?? computed.adminRate;
+
+                    return (
                     <tr key={request.id} className="border-b border-slate-700/30 hover:bg-slate-700/20">
                       <td className="p-4">
                         <div>
@@ -231,8 +249,11 @@ export default function WithdrawalsPage() {
                         </div>
                       </td>
                       <td className="p-4">
-                        <span className="text-white font-bold text-lg">₹{request.amount}</span>
-                        <p className="text-slate-400 text-xs">Balance: ₹{request.user?.walletBalance}</p>
+                        <span className="text-white font-bold text-lg">{'\u20B9'}{netAmount.toFixed(2)}</span>
+                        <p className="text-slate-400 text-xs">
+                          Deduction: {'\u20B9'}{totalDeduction.toFixed(2)} ({Math.round(tdsRate * 100)}% + {Math.round(adminRate * 100)}%)
+                        </p>
+                        <p className="text-slate-400 text-xs">Balance: {'\u20B9'}{request.user?.walletBalance}</p>
                       </td>
                       <td className="p-4">
                         <code className="bg-slate-700/50 px-2 py-1 rounded text-emerald-400 text-sm">
@@ -285,7 +306,8 @@ export default function WithdrawalsPage() {
                         )}
                       </td>
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -299,7 +321,7 @@ export default function WithdrawalsPage() {
           <div className="bg-slate-800 rounded-xl max-w-md w-full p-6 border border-slate-700">
             <h3 className="text-xl font-bold text-white mb-4">Reject Withdrawal Request</h3>
             <p className="text-slate-400 mb-4">
-              Rejecting withdrawal request of <span className="text-emerald-400 font-bold">₹{selectedRequest?.amount}</span> from <span className="text-white">{selectedRequest?.user?.name}</span>
+              Rejecting withdrawal request of <span className="text-emerald-400 font-bold">{'\u20B9'}{selectedNetAmount.toFixed(2)}</span> from <span className="text-white">{selectedRequest?.user?.name}</span>
             </p>
             <textarea
               value={rejectionReason}
@@ -333,6 +355,3 @@ export default function WithdrawalsPage() {
     </div>
   );
 }
-
-
-

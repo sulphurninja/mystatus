@@ -74,10 +74,10 @@ export default function ProfilePage() {
   }, [token]);
 
   const totalStars = 7;
-  // 1 base star for every account + 1 bonus star if they have at least 1 referral
+  // 1 bright star per direct referral (max 7). Default: all grey.
   const brightStars = Math.min(
     totalStars,
-    1 + (referralStats.total > 0 ? 1 : 0)
+    Math.max(0, referralStats.total)
   );
 
   const menuSections = [

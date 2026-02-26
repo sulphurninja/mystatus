@@ -5,6 +5,7 @@ import User from '@/models/User';
 import Transaction from '@/models/Transaction';
 import { verifyToken, getTokenFromRequest } from '@/middleware/auth';
 import mongoose from 'mongoose';
+import { calculateWithdrawalCharges } from '@/lib/withdrawalCharges';
 
 // PUT - Approve or reject a withdrawal request
 export async function PUT(
@@ -188,12 +189,20 @@ export async function GET(
       );
     }
 
+    const computed = calculateWithdrawalCharges(withdrawalRequest.amount);
+
     return NextResponse.json({
       success: true,
       data: {
         id: withdrawalRequest._id,
         user: withdrawalRequest.user,
         amount: withdrawalRequest.amount,
+        tdsRate: withdrawalRequest.tdsRate ?? computed.tdsRate,
+        adminRate: withdrawalRequest.adminRate ?? computed.adminRate,
+        tdsAmount: withdrawalRequest.tdsAmount ?? computed.tdsAmount,
+        adminCharge: withdrawalRequest.adminCharge ?? computed.adminAmount,
+        totalDeduction: withdrawalRequest.totalDeduction ?? computed.totalDeduction,
+        netAmount: withdrawalRequest.netAmount ?? computed.netAmount,
         activationKey: withdrawalRequest.activationKey,
         status: withdrawalRequest.status,
         requestedAt: withdrawalRequest.requestedAt,
@@ -210,4 +219,3 @@ export async function GET(
     );
   }
 }
-

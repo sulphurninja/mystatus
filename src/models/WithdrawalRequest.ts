@@ -5,6 +5,12 @@ export type WithdrawalStatus = 'pending' | 'approved' | 'rejected';
 export interface IWithdrawalRequest extends Document {
   user: mongoose.Types.ObjectId;
   amount: number;
+  tdsRate?: number;
+  adminRate?: number;
+  tdsAmount?: number;
+  adminCharge?: number;
+  totalDeduction?: number;
+  netAmount?: number;
   activationKey: string; // Key used for this withdrawal
   status: WithdrawalStatus;
   requestedAt: Date;
@@ -30,7 +36,37 @@ const WithdrawalRequestSchema: Schema = new Schema({
   amount: {
     type: Number,
     required: true,
-    min: [1, 'Withdrawal amount must be at least 1']
+    min: [2500, 'Withdrawal amount must be at least 2500']
+  },
+  tdsRate: {
+    type: Number,
+    default: 0.1,
+    min: 0
+  },
+  adminRate: {
+    type: Number,
+    default: 0.05,
+    min: 0
+  },
+  tdsAmount: {
+    type: Number,
+    default: 0,
+    min: 0
+  },
+  adminCharge: {
+    type: Number,
+    default: 0,
+    min: 0
+  },
+  totalDeduction: {
+    type: Number,
+    default: 0,
+    min: 0
+  },
+  netAmount: {
+    type: Number,
+    default: 0,
+    min: 0
   },
   activationKey: {
     type: String,
@@ -71,4 +107,3 @@ WithdrawalRequestSchema.index({ user: 1, createdAt: -1 });
 WithdrawalRequestSchema.index({ status: 1, createdAt: -1 });
 
 export default mongoose.models.WithdrawalRequest || mongoose.model<IWithdrawalRequest>('WithdrawalRequest', WithdrawalRequestSchema);
-
