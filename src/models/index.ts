@@ -11,11 +11,13 @@ import './MyStatusAd';
 import './MyStatusShare';
 import './WithdrawalRequest';
 import './KeyTier';
+import './ProductKeyTier';
 import './Package';
 import './VendorPackage';
 import './PropertyLead';
 import './LoanApplication';
 
 export {};
+
 
 

@@ -80,7 +80,13 @@ const navigation = [
     href: '/admin/key-tiers',
     icon: 'Layers',
     current: false
+  },  {
+    name: 'Product Keys',
+    href: '/admin/product-keys',
+    icon: 'Key',
+    current: false
   },
+
   {
     name: 'Analytics',
     href: '/admin/analytics',
@@ -483,3 +489,4 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     </div>
   );
 }
+
