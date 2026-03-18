@@ -6,8 +6,6 @@ import AppHeader from '@/components/app/AppHeader';
 import CoinAmount from '@/components/app/CoinAmount';
 import {
   User,
-  Mail,
-  Phone,
   Key,
   Wallet,
   ShoppingBag,
@@ -74,10 +72,9 @@ export default function ProfilePage() {
   }, [token]);
 
   const totalStars = 7;
-  // 1 bright star per direct referral (max 7). Default: all grey.
   const brightStars = Math.min(
     totalStars,
-    Math.max(0, referralStats.total)
+    Math.max(0, user?.starRating || 0)
   );
 
   const menuSections = [

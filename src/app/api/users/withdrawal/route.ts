@@ -9,6 +9,7 @@ import KeyTier from '@/models/KeyTier';
 import { verifyToken, getTokenFromRequest } from '@/middleware/auth';
 import mongoose from 'mongoose';
 import { calculateWithdrawalCharges } from '@/lib/withdrawalCharges';
+import { awardStarsForFirstActivation } from '@/lib/starRating';
 
 const MIN_WITHDRAWAL_AMOUNT = 2500;
 
@@ -116,7 +117,7 @@ export async function POST(request: NextRequest) {
     }
 
     const userId = decoded.id;
-    const { amount, activationKey, paymentDetails } = await request.json();
+    const { amount, paymentDetails } = await request.json();
 
     // Validate amount
     if (!amount || amount < MIN_WITHDRAWAL_AMOUNT) {
@@ -189,6 +190,7 @@ export async function POST(request: NextRequest) {
         key: normalizedKey,
         usedBy: userId
       }).session(dbSession);
+      let didActivateKey = false;
 
       // Fallback: user has a key linked but activationKey value is wrong
       if (!userKey) {
@@ -224,6 +226,7 @@ export async function POST(request: NextRequest) {
           }], { session: dbSession });
 
           userKey = await ActivationKey.findById(createdKeys[0]._id).session(dbSession);
+          didActivateKey = true;
         } else {
           if (looseKey.usedBy && looseKey.usedBy.toString() !== userId) {
             await dbSession.abortTransaction();
@@ -247,6 +250,7 @@ export async function POST(request: NextRequest) {
           );
 
           userKey = await ActivationKey.findById(looseKey._id).session(dbSession);
+          didActivateKey = true;
         }
       }
 
@@ -256,6 +260,10 @@ export async function POST(request: NextRequest) {
           { success: false, message: 'Your activation key was not found. Please contact support.' },
           { status: 400 }
         );
+      }
+
+      if (didActivateKey) {
+        await awardStarsForFirstActivation(user._id, dbSession);
       }
 
       const keyToUse = userKey;
@@ -350,7 +358,7 @@ export async function POST(request: NextRequest) {
     } catch (error) {
       try {
         await dbSession.abortTransaction();
-      } catch (abortError) {
+      } catch {
         // Ignore abort errors
       }
       throw error;

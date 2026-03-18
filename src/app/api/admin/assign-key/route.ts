@@ -7,6 +7,7 @@ import Transaction from '@/models/Transaction';
 import Commission from '@/models/Commission';
 import KeyTier from '@/models/KeyTier';
 import { authenticateRequest } from '@/middleware/auth';
+import { awardStarsForFirstActivation } from '@/lib/starRating';
 
 // Assign an activation key to a user (admin action)
 export async function POST(request: NextRequest) {
@@ -94,6 +95,8 @@ export async function POST(request: NextRequest) {
         { activationKey: key.key },
         { session }
       );
+
+      await awardStarsForFirstActivation(user._id, session);
 
       // Create transaction record (admin assignment - no debit from user)
       await Transaction.create(

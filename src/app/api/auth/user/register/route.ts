@@ -44,9 +44,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Generate token first (before transaction)
-    const token = generateToken('temp', 'user'); // We'll update this after user creation
-
     // Start transaction for user creation and commission processing
     const dbSession = await mongoose.startSession();
 
@@ -98,6 +95,7 @@ export async function POST(request: NextRequest) {
             email: user[0].email,
             phone: user[0].phone,
             referralCode: user[0].referralCode,
+            starRating: user[0].starRating,
             profileImage: user[0].profileImage,
             walletBalance: user[0].walletBalance
           },
@@ -109,7 +107,7 @@ export async function POST(request: NextRequest) {
       // Abort transaction on error
       try {
         await dbSession.abortTransaction();
-      } catch (abortError) {
+      } catch {
         // Ignore abort errors if transaction was already committed
       }
       throw error;

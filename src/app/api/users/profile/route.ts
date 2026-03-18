@@ -33,6 +33,7 @@ export async function GET(request: NextRequest) {
         phone: user.phone,
         activationKey: user.activationKey,
         referralCode: user.referralCode,
+        starRating: user.starRating,
         profileImage: user.profileImage,
         walletBalance: user.walletBalance,
         isActive: user.isActive,
@@ -93,6 +94,7 @@ export async function PUT(request: NextRequest) {
         phone: user.phone,
         activationKey: user.activationKey,
         referralCode: user.referralCode,
+        starRating: user.starRating,
         profileImage: user.profileImage,
         walletBalance: user.walletBalance,
         canShareAds: user.canShareAds
