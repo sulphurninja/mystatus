@@ -60,6 +60,7 @@ export async function POST(request: NextRequest) {
           phone: user.phone,
           activationKey: user.activationKey,
           referralCode: user.referralCode,
+          starRating: user.starRating,
           profileImage: user.profileImage,
           walletBalance: user.walletBalance
         },

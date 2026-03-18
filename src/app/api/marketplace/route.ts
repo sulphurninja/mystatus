@@ -7,6 +7,7 @@ import Transaction from '@/models/Transaction';
 import Commission from '@/models/Commission';
 import KeyTier from '@/models/KeyTier';
 import { authenticateRequest } from '@/middleware/auth';
+import { awardStarsForFirstActivation } from '@/lib/starRating';
 
 // Get user's purchased keys
 export async function PATCH(request: NextRequest) {
@@ -128,7 +129,7 @@ export async function POST(request: NextRequest) {
 
     await connectToDatabase();
 
-    const { keyId, tierId, referralCode } = await request.json();
+    const { keyId, tierId } = await request.json();
 
     // Support both keyId (direct) and tierId (from marketplace UI)
     let finalKeyId = keyId;
@@ -169,12 +170,6 @@ export async function POST(request: NextRequest) {
         { success: false, message: 'Insufficient balance' },
         { status: 400 }
       );
-    }
-
-    // Find referrer if referral code provided
-    let referrer = null;
-    if (referralCode) {
-      referrer = await User.findOne({ referralCode: referralCode.toUpperCase() });
     }
 
     // Start transaction
@@ -231,6 +226,8 @@ export async function POST(request: NextRequest) {
         await User.findByIdAndUpdate(buyer._id, {
           activationKey: key.key
         }, { session });
+
+        await awardStarsForFirstActivation(buyer._id, session);
       }
 
       // Handle MLM commissions based on buyer's referral chain

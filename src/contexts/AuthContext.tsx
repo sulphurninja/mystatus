@@ -8,6 +8,7 @@ export interface User {
   email: string;
   phone?: string;
   activationKey: string;
+  starRating?: number;
   balance: number;
   isActive: boolean;
   referralCode: string;
@@ -113,6 +114,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         email: user.email,
         phone: user.phone,
         activationKey: user.activationKey,
+        starRating: user.starRating,
         balance: user.walletBalance || 0,
         isActive: user.isActive || true,
         referralCode: user.referralCode,
@@ -169,6 +171,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         email: user.email,
         phone: user.phone,
         activationKey: user.activationKey,
+        starRating: user.starRating,
         balance: user.walletBalance || 0,
         isActive: user.isActive || true,
         referralCode: user.referralCode,
@@ -225,6 +228,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             email: user.email,
             phone: user.phone,
             activationKey: user.activationKey,
+            starRating: user.starRating,
             balance: user.walletBalance || 0,
             isActive: user.isActive,
             referralCode: user.referralCode,

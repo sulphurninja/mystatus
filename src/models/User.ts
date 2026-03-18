@@ -6,6 +6,8 @@ export interface IUser extends Document {
   email?: string;
   phone?: string;
   activationKey?: string;
+  starRating: number;
+  activationStarsAwarded: boolean;
   profileImage?: string;
   walletBalance: number;
   isActive: boolean;
@@ -49,6 +51,15 @@ const UserSchema: Schema = new Schema({
     unique: true,
     sparse: true, // Allow multiple null values
     index: true
+  },
+  starRating: {
+    type: Number,
+    default: 0,
+    min: 0
+  },
+  activationStarsAwarded: {
+    type: Boolean,
+    default: false
   },
   profileImage: {
     type: String
