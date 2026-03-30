@@ -22,7 +22,7 @@ export async function awardStarsForFirstActivation(
   if (user.referredBy) {
     await User.findByIdAndUpdate(
       user.referredBy,
-      { $inc: { starRating: 2 } },
+      { $inc: { starRating: 1 } },
       { session }
     );
   }

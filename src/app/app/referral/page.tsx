@@ -328,7 +328,7 @@ export default function ReferralPage() {
             </div>
           ) : (
             <div className="space-y-2">
-              {directReferrals.slice(0, 10).map((ref) => (
+              {directReferrals.map((ref) => (
                 <div key={ref.id} className="glass-card rounded-xl p-4">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-cyan-500 flex items-center justify-center">
