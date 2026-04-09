@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import AppHeader from '@/components/app/AppHeader';
-import { ShoppingBag, Key, Crown, CheckCircle2, Loader2, Store, Search, Plus, Users } from 'lucide-react';
+import { ShoppingBag, Key, Crown, CheckCircle2, Loader2, Store, Search, Plus, Users, Sparkles } from 'lucide-react';
 
 export default function MarketplacePage() {
   const { token, refreshUserProfile } = useAuth();
@@ -16,7 +16,11 @@ export default function MarketplacePage() {
   const [purchasingKey, setPurchasingKey] = useState<string | null>(null);
   const [selectedTier, setSelectedTier] = useState<any>(null);
   const [selectedVendorPackage, setSelectedVendorPackage] = useState<any>(null);
-  const [activeTab, setActiveTab] = useState<'keys' | 'vendors'>('keys');
+  const [activeTab, setActiveTab] = useState<'keys' | 'vendors' | 'franchise'>('keys');
+  const [franchiseTiers, setFranchiseTiers] = useState<any[]>([]);
+  const [franchiseLoading, setFranchiseLoading] = useState(false);
+  const [selectedFranchiseTier, setSelectedFranchiseTier] = useState<any>(null);
+  const [purchasingFranchise, setPurchasingFranchise] = useState<string | null>(null);
 
   // vendor purchase flow state
   const [vendorSearch, setVendorSearch] = useState('');
@@ -28,6 +32,10 @@ export default function MarketplacePage() {
   const [purchasingVendorPkg, setPurchasingVendorPkg] = useState(false);
 
   useEffect(() => {
+    if (!token) {
+      router.replace('/app/login');
+      return;
+    }
     fetchKeyTiers();
   }, [token]);
 
@@ -35,9 +43,16 @@ export default function MarketplacePage() {
     if (activeTab === 'vendors') {
       fetchVendorPackages();
     }
+    if (activeTab === 'franchise') {
+      fetchFranchiseKeys();
+    }
   }, [activeTab, token]);
 
   const fetchKeyTiers = async () => {
+    if (!token) {
+      setIsLoading(false);
+      return;
+    }
     try {
       const response = await fetch('/api/marketplace', {
         headers: { Authorization: `Bearer ${token}` },
@@ -81,6 +96,10 @@ export default function MarketplacePage() {
   };
 
   const fetchVendorPackages = async () => {
+    if (!token) {
+      setVendorLoading(false);
+      return;
+    }
     try {
       setVendorLoading(true);
       const res = await fetch('/api/vendor/packages', {
@@ -97,6 +116,50 @@ export default function MarketplacePage() {
       setVendorPackages([]);
     } finally {
       setVendorLoading(false);
+    }
+  };
+
+  const fetchFranchiseKeys = async () => {
+    if (!token) {
+      setFranchiseLoading(false);
+      return;
+    }
+    try {
+      setFranchiseLoading(true);
+      const response = await fetch('/api/marketplace/franchise', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const result = await response.json();
+      let keys: any[] = [];
+
+      if (result.success && result.data) {
+        keys = result.data;
+      }
+
+      const tierMap = new Map<string, any>();
+      keys.forEach((key: any) => {
+        const tierKey = `${key.price}-${key.name}`;
+        if (!tierMap.has(tierKey)) {
+          tierMap.set(tierKey, {
+            _id: tierKey,
+            name: key.name,
+            description: key.description || '',
+            price: key.price,
+            validity: key.validityDays || 0,
+            features: key.features || [],
+            availableKeys: []
+          });
+        }
+        tierMap.get(tierKey)!.availableKeys.push(key.id || key._id);
+      });
+
+      const groupedTiers = Array.from(tierMap.values()).sort((a, b) => a.price - b.price);
+      setFranchiseTiers(groupedTiers);
+    } catch (error) {
+      console.error('Error fetching franchise keys:', error);
+      setFranchiseTiers([]);
+    } finally {
+      setFranchiseLoading(false);
     }
   };
 
@@ -135,6 +198,41 @@ export default function MarketplacePage() {
       alert(error.message || 'Failed to purchase key');
     } finally {
       setPurchasingKey(null);
+    }
+  };
+
+  const handleFranchisePurchase = async (tier: any) => {
+    setPurchasingFranchise(tier._id);
+
+    try {
+      const keyId = tier.availableKeys?.[0];
+      if (!keyId) {
+        throw new Error('No keys available for this tier');
+      }
+
+      const response = await fetch('/api/marketplace/franchise', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ keyId })
+      });
+
+      const result = await response.json();
+      if (!response.ok || !result.success) {
+        throw new Error(result.message || result.error || 'Purchase failed');
+      }
+
+      await refreshUserProfile();
+      setSelectedFranchiseTier(null);
+      await fetchFranchiseKeys();
+      alert('Franchise key purchased and activated!');
+      router.push('/app/profile');
+    } catch (error: any) {
+      alert(error.message || 'Failed to purchase franchise key');
+    } finally {
+      setPurchasingFranchise(null);
     }
   };
 
@@ -235,6 +333,16 @@ export default function MarketplacePage() {
             }`}
           >
             Activation Keys
+          </button>
+          <button
+            onClick={() => setActiveTab('franchise')}
+            className={`flex-1 py-2 rounded-xl text-sm font-semibold transition-all ${
+              activeTab === 'franchise'
+                ? 'bg-amber-500/20 text-amber-200 border border-amber-500/40'
+                : 'text-slate-300'
+            }`}
+          >
+            Franchise Keys
           </button>
           <button
             onClick={() => setActiveTab('vendors')}
@@ -398,16 +506,105 @@ export default function MarketplacePage() {
             </div>
           </>
         )}
+
+        {activeTab === 'franchise' && (
+          <>
+            <div className="py-4">
+              <div className="flex items-center gap-3 mb-3">
+                <Sparkles className="w-8 h-8 text-amber-400" />
+                <h1 className="text-2xl font-bold text-slate-100">Purchase Franchise Keys</h1>
+              </div>
+              <p className="text-slate-400">
+                Daily recurring payouts to your upline up to 30 levels. Amounts are configured by admin.
+              </p>
+            </div>
+
+            <div className="space-y-4">
+              {franchiseLoading ? (
+                <div className="text-center py-16 bg-slate-800/30 backdrop-blur-sm border border-slate-700/50 rounded-2xl">
+                  <Loader2 className="w-10 h-10 text-amber-400 animate-spin mx-auto mb-3" />
+                  <p className="text-slate-400">Loading franchise keys...</p>
+                </div>
+              ) : franchiseTiers.length === 0 ? (
+                <div className="text-center py-16 bg-slate-800/30 backdrop-blur-sm border border-slate-700/50 rounded-2xl">
+                  <Sparkles className="w-12 h-12 text-slate-600 mx-auto mb-3" />
+                  <p className="text-slate-400">No franchise keys available</p>
+                </div>
+              ) : (
+                franchiseTiers.map((tier, index) => {
+                  const isPopular = index === 0;
+                  return (
+                    <div
+                      key={tier._id}
+                      className={`relative bg-slate-800/50 backdrop-blur-sm border rounded-3xl p-6 transition-all hover:border-amber-500/50 ${
+                        isPopular
+                          ? 'border-amber-500/30 shadow-lg shadow-amber-500/10'
+                          : 'border-slate-700/50'
+                      }`}
+                    >
+                      {isPopular && (
+                        <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-4 py-1 bg-gradient-to-r from-amber-500 to-orange-600 rounded-full">
+                          <span className="text-xs font-bold text-white flex items-center gap-1">
+                            <Sparkles className="w-3 h-3" />
+                            DAILY PAYOUTS
+                          </span>
+                        </div>
+                      )}
+
+                      <div className="flex items-start justify-between mb-4">
+                        <div>
+                          <h3 className="text-xl font-bold text-slate-100 mb-1">{tier.name}</h3>
+                          <p className="text-sm text-slate-400">{tier.description}</p>
+                        </div>
+                        <div className="w-12 h-12 bg-amber-500/20 rounded-2xl flex items-center justify-center flex-shrink-0">
+                          <Sparkles className="w-6 h-6 text-amber-400" />
+                        </div>
+                      </div>
+
+                      <div className="space-y-2 mb-6">
+                        {tier.features?.map((feature: string, i: number) => (
+                          <div key={i} className="flex items-center gap-2">
+                            <CheckCircle2 className="w-4 h-4 text-amber-400 flex-shrink-0" />
+                            <span className="text-sm text-slate-300">{feature}</span>
+                          </div>
+                        ))}
+                      </div>
+
+                      <div className="flex items-center justify-between pt-4 border-t border-slate-700/50">
+                        <div>
+                          <p className="text-sm text-slate-400 mb-1">Price</p>
+                          <p className="text-2xl font-bold text-amber-400">₹{tier.price || 0}</p>
+                          {tier.availableKeys?.length > 0 && (
+                            <p className="text-xs text-slate-500 mt-1">
+                              {tier.availableKeys.length} available
+                            </p>
+                          )}
+                        </div>
+                        <button
+                          onClick={() => setSelectedFranchiseTier(tier)}
+                          disabled={!tier.availableKeys || tier.availableKeys.length === 0}
+                          className="px-6 py-3 bg-gradient-to-r from-amber-500 to-orange-600 hover:shadow-lg hover:shadow-amber-500/40 text-white font-semibold rounded-xl transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          Purchase
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </>
+        )}
       </div>
 
       {/* Purchase Confirmation Modal */}
       {selectedTier && (
         <div
-          className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-end justify-center"
+          className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center"
           onClick={() => setSelectedTier(null)}
         >
           <div
-            className="bg-slate-900 w-full max-w-md rounded-t-3xl p-6 animate-slide-up"
+            className="bg-slate-900 w-full max-w-md rounded-t-3xl p-6 pb-8 animate-slide-up max-h-[82vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="w-12 h-1.5 bg-slate-700 rounded-full mx-auto mb-6"></div>
@@ -446,6 +643,64 @@ export default function MarketplacePage() {
                 className="flex-1 py-3.5 bg-gradient-to-r from-emerald-500 to-teal-600 text-white font-semibold rounded-xl flex items-center justify-center gap-2 disabled:opacity-50"
               >
                 {purchasingKey ? (
+                  <>
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    Processing...
+                  </>
+                ) : (
+                  'Confirm Purchase'
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {selectedFranchiseTier && (
+        <div
+          className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center"
+          onClick={() => setSelectedFranchiseTier(null)}
+        >
+          <div
+            className="bg-slate-900 w-full max-w-md rounded-t-3xl p-6 pb-8 animate-slide-up max-h-[82vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="w-12 h-1.5 bg-slate-700 rounded-full mx-auto mb-6"></div>
+
+            <h3 className="text-2xl font-bold text-slate-100 mb-2">Confirm Franchise Purchase</h3>
+            <p className="text-slate-400 mb-6">
+              You are about to purchase the <span className="text-amber-400 font-semibold">{selectedFranchiseTier.name}</span> franchise key
+            </p>
+
+            <div className="bg-slate-800/50 rounded-2xl p-4 mb-6 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-slate-400">Key Tier</span>
+                <span className="text-slate-100 font-semibold">{selectedFranchiseTier.name}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-slate-400">Payouts</span>
+                <span className="text-slate-100 font-semibold">Daily</span>
+              </div>
+              <div className="flex items-center justify-between pt-2 border-t border-slate-700/50">
+                <span className="text-slate-300 font-medium">Total</span>
+                <span className="text-2xl font-bold text-amber-400">₹{selectedFranchiseTier.price || 0}</span>
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => setSelectedFranchiseTier(null)}
+                disabled={purchasingFranchise !== null}
+                className="flex-1 py-3.5 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-slate-200 font-semibold rounded-xl transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => handleFranchisePurchase(selectedFranchiseTier)}
+                disabled={purchasingFranchise !== null}
+                className="flex-1 py-3.5 bg-gradient-to-r from-amber-500 to-orange-600 text-white font-semibold rounded-xl flex items-center justify-center gap-2 disabled:opacity-50"
+              >
+                {purchasingFranchise ? (
                   <>
                     <Loader2 className="w-5 h-5 animate-spin" />
                     Processing...

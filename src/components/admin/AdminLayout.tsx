@@ -76,11 +76,30 @@ const navigation = [
     current: false
   },
   {
+    name: 'Franchise Keys',
+    href: '/admin/franchise-keys',
+    icon: 'Key',
+    current: false
+  },
+  {
     name: 'Key Tiers',
     href: '/admin/key-tiers',
     icon: 'Layers',
     current: false
-  },  {
+  },
+  {
+    name: 'Franchise Tiers',
+    href: '/admin/franchise-tiers',
+    icon: 'Layers',
+    current: false
+  },
+  {
+    name: 'Franchise Payouts',
+    href: '/admin/franchise-payouts',
+    icon: 'TrendingUp',
+    current: false
+  },
+  {
     name: 'Product Keys',
     href: '/admin/product-keys',
     icon: 'Key',
@@ -274,6 +293,13 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
                           </svg>
                         )}
+                        {item.icon === 'Layers' && (
+                          <svg className={`w-5 h-5 ${isActive ? 'text-white' : 'text-slate-400 group-hover:text-slate-300'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3l9 5-9 5-9-5 9-5z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l9 5 9-5" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 17l9 5 9-5" />
+                          </svg>
+                        )}
                         {item.icon === 'TrendingUp' && (
                           <svg className={`w-5 h-5 ${isActive ? 'text-white' : 'text-slate-400 group-hover:text-slate-300'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
@@ -421,6 +447,13 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
                         {item.icon === 'Key' && (
                           <svg className={`w-5 h-5 ${isActive ? 'text-white' : 'text-slate-400 group-hover:text-slate-300'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+                          </svg>
+                        )}
+                        {item.icon === 'Layers' && (
+                          <svg className={`w-5 h-5 ${isActive ? 'text-white' : 'text-slate-400 group-hover:text-slate-300'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3l9 5-9 5-9-5 9-5z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l9 5 9-5" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 17l9 5 9-5" />
                           </svg>
                         )}
                         {item.icon === 'TrendingUp' && (

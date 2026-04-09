@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import connectToDatabase from '@/lib/mongodb';
 import User from '@/models/User';
+import FranchiseKey from '@/models/FranchiseKey';
+import FranchisePayoutPlan from '@/models/FranchisePayoutPlan';
 import { authenticateRequest } from '@/middleware/auth';
 
 export async function GET(request: NextRequest) {
@@ -24,6 +26,15 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    const franchiseKeysCount = await FranchiseKey.countDocuments({
+      purchasedBy: user._id
+    });
+
+    const activeFranchisePlans = await FranchisePayoutPlan.countDocuments({
+      owner: user._id,
+      isActive: true
+    });
+
     return NextResponse.json({
       success: true,
       data: {
@@ -38,6 +49,8 @@ export async function GET(request: NextRequest) {
         walletBalance: user.walletBalance,
         isActive: user.isActive,
         canShareAds: user.canShareAds,
+        franchiseKeysCount,
+        activeFranchisePlans,
         createdAt: user.createdAt
       }
     });
