@@ -105,6 +105,12 @@ export default function ProfilePage() {
           href: '/app/purchased-keys',
           color: 'text-amber-400',
         },
+        {
+          icon: Key,
+          label: 'Franchise Keys',
+          href: '/app/purchased-franchise-keys',
+          color: 'text-amber-300',
+        },
       ],
     },
     {
@@ -242,6 +248,21 @@ export default function ProfilePage() {
               </div>
             </div>
 
+
+            <div className="mt-4 grid grid-cols-2 gap-3">
+              <div className="bg-slate-900/50 rounded-xl p-3">
+                <p className="text-xs text-slate-400 mb-1">Franchise Keys</p>
+                <p className="text-sm font-bold text-slate-100">
+                  {user?.franchiseKeysCount || 0}
+                </p>
+              </div>
+              <div className="bg-slate-900/50 rounded-xl p-3">
+                <p className="text-xs text-slate-400 mb-1">Active Plans</p>
+                <p className="text-sm font-bold text-emerald-400">
+                  {user?.activeFranchisePlans || 0}
+                </p>
+              </div>
+            </div>
             {/* Activation Key */}
             <div className="mt-4 pt-4 border-t border-slate-700/50">
               <div className="flex items-center justify-between">
@@ -323,3 +344,4 @@ export default function ProfilePage() {
     </div>
   );
 }
+

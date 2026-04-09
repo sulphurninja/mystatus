@@ -20,6 +20,8 @@ export interface User {
     name: string;
     withdrawalLimit: number;
   };
+  franchiseKeysCount?: number;
+  activeFranchisePlans?: number;
   createdAt: string;
 }
 
@@ -123,6 +125,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         withdrawalLimit: user.withdrawalLimit,
         totalWithdrawn: user.totalWithdrawn,
         keyTier: user.keyTier,
+        franchiseKeysCount: user.franchiseKeysCount,
+        activeFranchisePlans: user.activeFranchisePlans,
         createdAt: user.createdAt
       };
       
@@ -180,6 +184,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         withdrawalLimit: user.withdrawalLimit,
         totalWithdrawn: user.totalWithdrawn,
         keyTier: user.keyTier,
+        franchiseKeysCount: user.franchiseKeysCount,
+        activeFranchisePlans: user.activeFranchisePlans,
         createdAt: user.createdAt
       };
       
@@ -233,6 +239,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             isActive: user.isActive,
             referralCode: user.referralCode,
             profileImage: user.profileImage,
+            franchiseKeysCount: user.franchiseKeysCount,
+            activeFranchisePlans: user.activeFranchisePlans
           };
           updateUser(userData);
         }

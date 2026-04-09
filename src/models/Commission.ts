@@ -1,12 +1,18 @@
 import mongoose, { Document, Schema } from 'mongoose';
 
-export type CommissionType = 'referral' | 'level_bonus' | 'key_purchase' | 'key_activation' | 'key_renewal';
+export type CommissionType =
+  | 'referral'
+  | 'level_bonus'
+  | 'key_purchase'
+  | 'key_activation'
+  | 'key_renewal'
+  | 'franchise_daily';
 
 export interface ICommission extends Document {
   user: mongoose.Types.ObjectId;
   referredUser?: mongoose.Types.ObjectId;
   commissionType: CommissionType;
-  level: number; // 1-6 for MLM levels
+  level: number; // 1-30 for MLM levels
   amount: number;
   description: string;
   isPaid: boolean;
@@ -27,14 +33,14 @@ const CommissionSchema: Schema = new Schema({
   },
   commissionType: {
     type: String,
-    enum: ['referral', 'level_bonus', 'key_purchase', 'key_activation', 'key_renewal'],
+    enum: ['referral', 'level_bonus', 'key_purchase', 'key_activation', 'key_renewal', 'franchise_daily'],
     required: true
   },
   level: {
     type: Number,
     required: true,
     min: 1,
-    max: 6
+    max: 30
   },
   amount: {
     type: Number,
