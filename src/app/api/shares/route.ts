@@ -109,7 +109,51 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Daily share limits removed: users can create unlimited shares per day.
+    // Check share limit logic
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const sharesToday = await Share.countDocuments({
+      user: auth.user!.id,
+      createdAt: { $gte: today }
+    });
+
+    // Determine share limit based on referral status
+    // Base limit
+    let dailyLimit = 10;
+
+    // Check if user has any referrals who purchased a key (active referrals)
+    // We check this by looking for 'key_activation' commissions earned by this user
+    try {
+      // Need to import Commission model
+      const Commission = (await import('@/models/Commission')).default;
+      const hasKeyCommissions = await Commission.exists({
+        user: auth.user!.id,
+        commissionType: 'key_activation'
+      });
+
+      // If user has earned key commissions, they get the boosted limit
+      if (hasKeyCommissions) {
+        // Limit scales with referral level: (Level + 1) * 10
+        // Level 1 -> 20, Level 2 -> 30, etc.
+        const userLevel = auth.user!.referralLevel || 1;
+        dailyLimit = (userLevel + 1) * 10;
+      }
+    } catch (err) {
+      console.error('Error checking commission status for share limit:', err);
+      // Fallback to base limit on error
+    }
+
+    if (sharesToday >= dailyLimit) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: `You have reached your daily share limit of ${dailyLimit}. ${dailyLimit === 10 ? 'Refer friends who purchase keys to increase your limit!' : 'Level up to increase your limit further!'}`
+        },
+        { status: 400 }
+      );
+    }
+
     // We still prevent multiple simultaneous pending shares for the same ad,
     // and enforce a 24-hour cooldown after the last share attempt.
 
