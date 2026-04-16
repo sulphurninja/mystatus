@@ -22,6 +22,11 @@ export default function MarketplacePage() {
   const [selectedFranchiseTier, setSelectedFranchiseTier] = useState<any>(null);
   const [purchasingFranchise, setPurchasingFranchise] = useState<string | null>(null);
 
+  const formatInr = (value: unknown) => {
+    const n = typeof value === 'number' ? value : Number(value);
+    return (Number.isFinite(n) ? n : 0).toFixed(2);
+  };
+
   // vendor purchase flow state
   const [vendorSearch, setVendorSearch] = useState('');
   const [searchResults, setSearchResults] = useState<any[]>([]);
@@ -573,7 +578,7 @@ export default function MarketplacePage() {
                       <div className="flex items-center justify-between pt-4 border-t border-slate-700/50">
                         <div>
                           <p className="text-sm text-slate-400 mb-1">Price</p>
-                          <p className="text-2xl font-bold text-amber-400">₹{tier.price || 0}</p>
+                          <p className="text-2xl font-bold text-amber-400">₹{formatInr(tier.price)}</p>
                           {tier.availableKeys?.length > 0 && (
                             <p className="text-xs text-slate-500 mt-1">
                               {tier.availableKeys.length} available
@@ -683,7 +688,7 @@ export default function MarketplacePage() {
               </div>
               <div className="flex items-center justify-between pt-2 border-t border-slate-700/50">
                 <span className="text-slate-300 font-medium">Total</span>
-                <span className="text-2xl font-bold text-amber-400">₹{selectedFranchiseTier.price || 0}</span>
+                <span className="text-2xl font-bold text-amber-400">₹{formatInr(selectedFranchiseTier.price)}</span>
               </div>
             </div>
 
