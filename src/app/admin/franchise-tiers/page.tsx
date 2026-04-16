@@ -372,7 +372,8 @@ export default function FranchiseTiersPage() {
                     <Input
                       type="number"
                       value={tier.minPrice}
-                      onChange={(e) => updateTier(index, 'minPrice', parseInt(e.target.value) || 0)}
+                      step="0.01"
+                      onChange={(e) => updateTier(index, 'minPrice', parseFloat(e.target.value) || 0)}
                       className="bg-slate-800/60 border-slate-700/50 text-slate-100"
                       min="0"
                     />
@@ -382,7 +383,8 @@ export default function FranchiseTiersPage() {
                     <Input
                       type="number"
                       value={tier.maxPrice}
-                      onChange={(e) => updateTier(index, 'maxPrice', parseInt(e.target.value) || 0)}
+                      step="0.01"
+                      onChange={(e) => updateTier(index, 'maxPrice', parseFloat(e.target.value) || 0)}
                       className="bg-slate-800/60 border-slate-700/50 text-slate-100"
                       min="0"
                     />
@@ -398,7 +400,10 @@ export default function FranchiseTiersPage() {
                         <Input
                           type="number"
                           value={tier.dailyCommissions[levelKey] || 0}
-                          onChange={(e) => updateTier(index, `dailyCommissions.${levelKey}`, parseInt(e.target.value) || 0)}
+                          step="0.01"
+                          onChange={(e) =>
+                            updateTier(index, `dailyCommissions.${levelKey}`, parseFloat(e.target.value) || 0)
+                          }
                           className="bg-slate-700/50 border-slate-600/50 text-slate-100 text-center"
                           min="0"
                         />
@@ -410,7 +415,7 @@ export default function FranchiseTiersPage() {
                 <div className="flex items-center justify-between bg-slate-800/40 rounded-xl p-4">
                   <span className="text-slate-400">Total Daily Commission (All Levels)</span>
                   <span className="text-2xl font-bold text-amber-400">
-                    INR {Object.values(tier.dailyCommissions).reduce((sum, val) => sum + (val || 0), 0)}
+                    INR {Object.values(tier.dailyCommissions).reduce((sum, val) => sum + (val || 0), 0).toFixed(2)}
                   </span>
                 </div>
               </div>

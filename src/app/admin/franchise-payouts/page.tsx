@@ -32,6 +32,11 @@ export default function FranchisePayoutsPage() {
   const [running, setRunning] = useState(false);
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
 
+  const formatInr = (value: unknown) => {
+    const n = typeof value === 'number' ? value : Number(value);
+    return (Number.isFinite(n) ? n : 0).toFixed(2);
+  };
+
   useEffect(() => {
     checkAuth();
     loadData();
@@ -168,7 +173,7 @@ export default function FranchisePayoutsPage() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-4">
           <p className="text-xs text-slate-400 mb-1">Total Paid</p>
-          <p className="text-2xl font-bold text-amber-400">INR {totalPaid}</p>
+          <p className="text-2xl font-bold text-amber-400">INR {formatInr(totalPaid)}</p>
         </div>
         <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-4">
           <p className="text-xs text-slate-400 mb-1">Recipients</p>
@@ -193,7 +198,7 @@ export default function FranchisePayoutsPage() {
                   <div className="text-xs text-slate-500">Status: {run.status}</div>
                 </div>
                 <div className="text-sm text-slate-400">
-                  Paid INR {run.totalPaid || 0} to {run.totalRecipients || 0} recipients
+                  Paid INR {formatInr(run.totalPaid)} to {run.totalRecipients || 0} recipients
                 </div>
               </div>
             ))
@@ -213,7 +218,7 @@ export default function FranchisePayoutsPage() {
                   <span className="text-slate-200 font-semibold">
                     {payout.paidTo?.name || 'User'} · Level {payout.level}
                   </span>
-                  <span className="text-amber-300 font-semibold">INR {payout.amount}</span>
+                  <span className="text-amber-300 font-semibold">INR {formatInr(payout.amount)}</span>
                 </div>
                 <div className="text-xs text-slate-500">
                   Referred user: {payout.referredUser?.name || 'N/A'} · Key: {payout.franchiseKey?.key || 'N/A'}

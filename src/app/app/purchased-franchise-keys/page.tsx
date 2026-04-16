@@ -115,7 +115,7 @@ export default function PurchasedFranchiseKeysPage() {
                     <div className="bg-slate-900/50 rounded-xl p-3 space-y-2">
                       <div className="flex items-center justify-between text-sm">
                         <span className="text-slate-400">Purchase Price</span>
-                        <span className="text-amber-400 font-semibold">₹{key.price}</span>
+                        <span className="text-amber-400 font-semibold">₹{Number(key.price || 0).toFixed(2)}</span>
                       </div>
                       <div className="flex items-center justify-between text-sm">
                         <span className="text-slate-400">Purchased On</span>

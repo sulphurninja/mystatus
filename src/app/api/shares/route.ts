@@ -50,36 +50,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check if user has already been rewarded for this advertisement
-    // Once verified, they cannot share this ad again
-    const verifiedShare = await Share.findOne({
-      user: auth.user!.id,
-      advertisement: advertisementId,
-      status: 'verified'
-    });
-
-    if (verifiedShare) {
-      return NextResponse.json(
-        { success: false, message: 'You have already been rewarded for sharing this advertisement. You cannot share it again.' },
-        { status: 400 }
-      );
-    }
-
-    // Check if user already has ANY share (pending/verified/rejected) for this advertisement
+    // Check if user already has a pending share for this advertisement
+    // (unique index also enforces this, but we return a friendly response)
     const existingShare = await Share.findOne({
       user: auth.user!.id,
       advertisement: advertisementId,
-      status: { $in: ['pending', 'verified'] }
+      status: 'pending'
     }).populate('advertisement', 'title');
 
     if (existingShare) {
-      if (existingShare.status === 'verified') {
-        return NextResponse.json(
-          { success: false, message: 'You have already been rewarded for sharing this advertisement.' },
-          { status: 400 }
-        );
-      }
-      
       // Return the existing pending share instead of creating a duplicate
       return NextResponse.json({
         success: true,
@@ -99,47 +78,40 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Check share limit logic
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    // Allow re-sharing an ad after a 24-hour cooldown from the last share attempt
+    // (regardless of status). Pending shares are handled above.
+    const cooldownMs = 24 * 60 * 60 * 1000;
+    const now = new Date();
 
-    const sharesToday = await Share.countDocuments({
+    const lastShare = await Share.findOne({
       user: auth.user!.id,
-      createdAt: { $gte: today }
-    });
+      advertisement: advertisementId
+    }).sort({ sharedAt: -1, createdAt: -1 });
 
-    // Determine share limit based on referral status
-    // Base limit
-    let dailyLimit = 10;
+    if (lastShare) {
+      const lastShareAt = lastShare.sharedAt || lastShare.createdAt;
+      const nextAllowedAt = new Date(lastShareAt.getTime() + cooldownMs);
+      if (now < nextAllowedAt) {
+        const msRemaining = nextAllowedAt.getTime() - now.getTime();
+        const hours = Math.floor(msRemaining / (60 * 60 * 1000));
+        const minutes = Math.ceil((msRemaining % (60 * 60 * 1000)) / (60 * 1000));
 
-    // Check if user has any referrals who purchased a key (active referrals)
-    // We check this by looking for 'key_activation' commissions earned by this user
-    try {
-      // Need to import Commission model
-      const Commission = (await import('@/models/Commission')).default;
-      const hasKeyCommissions = await Commission.exists({
-        user: auth.user!.id,
-        commissionType: 'key_activation'
-      });
+        const remainingText =
+          hours <= 0 ? `${minutes} min` : `${hours}h ${minutes}m`;
 
-      // If user has earned key commissions, they get the boosted limit
-      if (hasKeyCommissions) {
-        // Limit scales with referral level: (Level + 1) * 10
-        // Level 1 -> 20, Level 2 -> 30, etc.
-        const userLevel = auth.user!.referralLevel || 1;
-        dailyLimit = (userLevel + 1) * 10;
+        return NextResponse.json(
+          {
+            success: false,
+            message: `You can share this ad again in ${remainingText}.`
+          },
+          { status: 400 }
+        );
       }
-    } catch (err) {
-      console.error('Error checking commission status for share limit:', err);
-      // Fallback to base limit on error
     }
 
-    if (sharesToday >= dailyLimit) {
-      return NextResponse.json(
-        { success: false, message: `You have reached your daily share limit of ${dailyLimit}. ${dailyLimit === 10 ? 'Refer friends who purchase keys to increase your limit!' : 'Level up to increase your limit further!'}` },
-        { status: 400 }
-      );
-    }
+    // Daily share limits removed: users can create unlimited shares per day.
+    // We still prevent multiple simultaneous pending shares for the same ad,
+    // and enforce a 24-hour cooldown after the last share attempt.
 
     // Create share record with duplicate protection
     const verificationDeadline = new Date();

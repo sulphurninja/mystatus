@@ -181,7 +181,11 @@ export default function FranchiseKeysPage() {
               type="number"
               value={price}
               min={0}
-              onChange={(e) => setPrice(parseInt(e.target.value) || 0)}
+              step="0.01"
+              onChange={(e) => {
+                const next = parseFloat(e.target.value);
+                setPrice(Number.isFinite(next) ? next : 0);
+              }}
               className="bg-slate-800/60 border-slate-700/50 text-slate-100"
             />
           </div>
@@ -217,7 +221,7 @@ export default function FranchiseKeysPage() {
               <div key={item._id} className="px-6 py-4 flex flex-col gap-1">
                 <div className="flex items-center justify-between">
                   <span className="text-slate-200 font-semibold">{item.key}</span>
-                  <span className="text-amber-300 font-semibold">INR {item.price}</span>
+                  <span className="text-amber-300 font-semibold">INR {Number(item.price || 0).toFixed(2)}</span>
                 </div>
                 <div className="text-xs text-slate-500">
                   {item.isUsed ? `Used by ${item.usedBy?.name || 'User'}` : 'Not used'}
