@@ -26,6 +26,7 @@ export default function VerificationsPage() {
   const [loading, setLoading] = useState(true);
   const [selectedShare, setSelectedShare] = useState<Share | null>(null);
   const [filter, setFilter] = useState('pending');
+  const [searchQuery, setSearchQuery] = useState('');
   const [rejectionReason, setRejectionReason] = useState('');
   const [showTransactionModal, setShowTransactionModal] = useState(false);
 
@@ -144,6 +145,17 @@ export default function VerificationsPage() {
     return 'Pending';
   };
 
+  const normalizedSearch = searchQuery.trim().toLowerCase();
+  const filteredShares = normalizedSearch
+    ? shares.filter((share) =>
+      [
+        share._id,
+        share.user?.name,
+        share.advertisement?.title,
+      ].some((value) => value?.toLowerCase().includes(normalizedSearch))
+    )
+    : shares;
+
   return (
     <div className="min-h-screen bg-[#0f172a] p-6 lg:p-8 space-y-8 text-slate-200">
       {/* Header */}
@@ -160,25 +172,44 @@ export default function VerificationsPage() {
           </p>
         </div>
 
-        {/* Filters */}
-        <div className="flex bg-slate-800/40 backdrop-blur-md p-1.5 rounded-2xl border border-slate-700/50">
-          {[
-            { key: 'pending', label: 'Pending' },
-            { key: 'verified', label: 'Approved' },
-            { key: 'rejected', label: 'Rejected' },
-            { key: 'all', label: 'All' },
-          ].map((tab) => (
-            <button
-              key={tab.key}
-              onClick={() => setFilter(tab.key)}
-              className={`px-5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-300 ${filter === tab.key
-                ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-lg shadow-indigo-500/20'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/30'
-                }`}
+        {/* Filters + Search */}
+        <div className="w-full md:w-auto space-y-3">
+          <div className="flex bg-slate-800/40 backdrop-blur-md p-1.5 rounded-2xl border border-slate-700/50 overflow-x-auto">
+            {[
+              { key: 'pending', label: 'Pending' },
+              { key: 'verified', label: 'Approved' },
+              { key: 'rejected', label: 'Rejected' },
+              { key: 'all', label: 'All' },
+            ].map((tab) => (
+              <button
+                key={tab.key}
+                onClick={() => setFilter(tab.key)}
+                className={`px-5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-300 whitespace-nowrap ${filter === tab.key
+                  ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-lg shadow-indigo-500/20'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/30'
+                  }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+          <div className="relative">
+            <svg
+              className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
             >
-              {tab.label}
-            </button>
-          ))}
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M10.5 18a7.5 7.5 0 100-15 7.5 7.5 0 000 15z" />
+            </svg>
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search by user, ad title, or share ID"
+              className="w-full md:w-[360px] h-11 rounded-xl bg-slate-800/40 border border-slate-700/50 pl-11 pr-4 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-500/40"
+            />
+          </div>
         </div>
       </div>
 
@@ -213,7 +244,7 @@ export default function VerificationsPage() {
             <div key={i} className="h-[280px] bg-slate-800/20 backdrop-blur-sm rounded-3xl border border-slate-700/50 animate-pulse"></div>
           ))}
         </div>
-      ) : shares.length === 0 ? (
+      ) : filteredShares.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 bg-slate-800/20 backdrop-blur-sm rounded-[3rem] border border-slate-700/50">
           <div className="w-24 h-24 bg-slate-700/30 rounded-3xl flex items-center justify-center mb-6">
             <svg className="w-12 h-12 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -221,11 +252,15 @@ export default function VerificationsPage() {
             </svg>
           </div>
           <h3 className="text-2xl font-bold text-white">No submissions found</h3>
-          <p className="text-slate-400 mt-2 text-center max-w-sm">No shares are currently available in the {filter} status filter.</p>
+          <p className="text-slate-400 mt-2 text-center max-w-sm">
+            {searchQuery.trim()
+              ? `No results found for "${searchQuery.trim()}".`
+              : `No shares are currently available in the ${filter} status filter.`}
+          </p>
         </div>
       ) : (
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-          {shares.map((share) => (
+          {filteredShares.map((share) => (
             <div key={share._id} className="group bg-slate-800/30 backdrop-blur-md rounded-[2.5rem] border border-slate-700/50 hover:border-indigo-500/40 transition-all duration-300 overflow-hidden flex flex-col md:flex-row">
               {/* Media Preview Section */}
               <div className="md:w-64 h-64 md:h-auto relative bg-black/40 overflow-hidden">
@@ -311,7 +346,7 @@ export default function VerificationsPage() {
                         {share.user?.name || 'Anonymous User'}
                       </h3>
                       <p className="text-sm text-slate-400 font-medium">
-                        Shared on {new Date(share.sharedAt).toLocaleDateString()}
+                        Shared on {new Date(share.sharedAt).toLocaleDateString()} at {new Date(share.sharedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true })}
                       </p>
                     </div>
                   </div>
