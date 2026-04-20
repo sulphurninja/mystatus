@@ -2,22 +2,30 @@ import { NextRequest, NextResponse } from 'next/server';
 import connectToDatabase from '@/lib/mongodb';
 import { runDailyFranchisePayouts } from '@/lib/franchisePayouts';
 
-// POST /api/cron/franchise-payouts - Trigger daily payouts (cron-safe)
-export async function POST(request: NextRequest) {
-  try {
-    const secret = process.env.FRANCHISE_PAYOUT_CRON_SECRET;
-    const provided = request.headers.get('x-cron-secret') || '';
+async function authorizeCronRequest(request: NextRequest) {
+  const secret = process.env.FRANCHISE_PAYOUT_CRON_SECRET;
+  const providedHeader = request.headers.get('x-cron-secret') || '';
+  const providedQuery = new URL(request.url).searchParams.get('secret') || '';
 
-    if (secret && provided !== secret) {
-      return NextResponse.json(
-        { success: false, message: 'Unauthorized' },
-        { status: 401 }
-      );
+  if (secret && providedHeader !== secret && providedQuery !== secret) {
+    return NextResponse.json(
+      { success: false, message: 'Unauthorized' },
+      { status: 401 }
+    );
+  }
+
+  return null;
+}
+
+async function handleCronRequest(request: NextRequest, body?: { date?: string; limit?: number }) {
+  try {
+    const authError = await authorizeCronRequest(request);
+    if (authError) {
+      return authError;
     }
 
     await connectToDatabase();
 
-    const body = await request.json().catch(() => ({}));
     const summary = await runDailyFranchisePayouts({
       date: body?.date,
       limit: body?.limit
@@ -35,4 +43,23 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
+}
+
+// GET /api/cron/franchise-payouts - Trigger daily payouts from a scheduler
+export async function GET(request: NextRequest) {
+  const url = new URL(request.url);
+  const date = url.searchParams.get('date') || undefined;
+  const limitParam = url.searchParams.get('limit');
+  const limit = limitParam ? parseInt(limitParam, 10) : undefined;
+
+  return handleCronRequest(request, {
+    date,
+    limit: Number.isFinite(limit) ? limit : undefined
+  });
+}
+
+// POST /api/cron/franchise-payouts - Trigger daily payouts manually or from cron
+export async function POST(request: NextRequest) {
+  const body = await request.json().catch(() => ({}));
+  return handleCronRequest(request, body);
 }

@@ -9,16 +9,20 @@ interface Lead {
   email?: string;
   address?: string;
   requiresLoan?: boolean;
+  loanAmount?: number | null;
   referralCode?: string;
   property?: { _id: string; title: string } | null;
   createdAt: string;
   loan?: {
+    loanAmount: number | null;
     pan: string;
     aadhaar: string;
     panCardUrl: string;
     aadhaarCardUrl: string;
     bankStatementUrl: string;
+    status: 'pending' | 'approved' | 'rejected';
     createdAt: string;
+    reviewedAt?: string;
   } | null;
 }
 
@@ -41,6 +45,12 @@ export default function PropertyLeadsPage() {
     const token = typeof window !== 'undefined' ? localStorage.getItem('adminToken') : null;
     return token ? { Authorization: `Bearer ${token}` } : {};
   };
+
+  const formatLoanAmount = (value?: number | null) =>
+    typeof value === 'number' && Number.isFinite(value) && value > 0 ? `INR ${value}` : 'Not provided';
+
+  const getDocumentViewUrl = (url: string) =>
+    `/api/document-view?url=${encodeURIComponent(url)}`;
 
   const origin = useMemo(() => {
     if (typeof window === 'undefined') return '';
@@ -282,6 +292,10 @@ export default function PropertyLeadsPage() {
                 <p className="text-xs uppercase tracking-widest text-slate-500 mb-2">Loan Required</p>
                 <p className="text-slate-100 font-semibold">{selectedLead.requiresLoan ? 'Yes' : 'No'}</p>
               </div>
+              <div className="rounded-2xl border border-slate-800/80 bg-slate-900/60 p-4">
+                <p className="text-xs uppercase tracking-widest text-slate-500 mb-2">Requested Loan Amount</p>
+                <p className="text-slate-100 font-semibold">{formatLoanAmount(selectedLead.loan?.loanAmount ?? selectedLead.loanAmount)}</p>
+              </div>
             </div>
 
             <div className="rounded-2xl border border-slate-800/80 bg-slate-900/60 p-4">
@@ -306,6 +320,10 @@ export default function PropertyLeadsPage() {
               {selectedLead.loan ? (
                 <div className="grid gap-3 md:grid-cols-2 text-sm">
                   <div>
+                    <p className="text-xs text-slate-500 mb-1">Loan Amount</p>
+                    <p className="text-slate-100 font-semibold">{formatLoanAmount(selectedLead.loan.loanAmount)}</p>
+                  </div>
+                  <div>
                     <p className="text-xs text-slate-500 mb-1">PAN</p>
                     <p className="text-slate-100 font-semibold">{selectedLead.loan.pan}</p>
                   </div>
@@ -315,7 +333,7 @@ export default function PropertyLeadsPage() {
                   </div>
                   <div>
                     <a
-                      href={selectedLead.loan.panCardUrl}
+                      href={getDocumentViewUrl(selectedLead.loan.panCardUrl)}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="text-emerald-300 hover:text-emerald-200 underline"
@@ -325,7 +343,7 @@ export default function PropertyLeadsPage() {
                   </div>
                   <div>
                     <a
-                      href={selectedLead.loan.aadhaarCardUrl}
+                      href={getDocumentViewUrl(selectedLead.loan.aadhaarCardUrl)}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="text-emerald-300 hover:text-emerald-200 underline"
@@ -335,13 +353,17 @@ export default function PropertyLeadsPage() {
                   </div>
                   <div>
                     <a
-                      href={selectedLead.loan.bankStatementUrl}
+                      href={getDocumentViewUrl(selectedLead.loan.bankStatementUrl)}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="text-emerald-300 hover:text-emerald-200 underline"
                     >
                       View Bank Statement
                     </a>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-500 mb-1">Status</p>
+                    <p className="text-slate-100 font-semibold capitalize">{selectedLead.loan.status}</p>
                   </div>
                   <div>
                     <p className="text-xs text-slate-500 mb-1">Loan Submitted</p>

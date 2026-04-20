@@ -46,7 +46,7 @@ export async function GET(request: NextRequest) {
           email: pair.email,
           contactNumber: pair.contactNumber
         }))
-      }).select('email contactNumber pan aadhaar panCardUrl aadhaarCardUrl bankStatementUrl createdAt');
+      }).select('email contactNumber loanAmount pan aadhaar panCardUrl aadhaarCardUrl bankStatementUrl status createdAt reviewedAt');
 
       loanDocs.forEach((doc: any) => {
         const key = `${doc.email}|${doc.contactNumber}`;
@@ -63,6 +63,7 @@ export async function GET(request: NextRequest) {
         email: lead.email,
         address: lead.address,
         requiresLoan: !!lead.requiresLoan,
+        loanAmount: lead.loanAmount,
         referralCode: lead.referralCode || '',
         property: lead.property
           ? { _id: lead.property._id, title: lead.property.title }
@@ -73,12 +74,15 @@ export async function GET(request: NextRequest) {
           const match = loanMap.get(key);
           if (!match) return null;
           return {
+            loanAmount: typeof match.loanAmount === 'number' ? match.loanAmount : lead.loanAmount,
             pan: match.pan,
             aadhaar: match.aadhaar,
             panCardUrl: match.panCardUrl,
             aadhaarCardUrl: match.aadhaarCardUrl,
             bankStatementUrl: match.bankStatementUrl,
-            createdAt: match.createdAt
+            status: match.status || 'pending',
+            createdAt: match.createdAt,
+            reviewedAt: match.reviewedAt
           };
         })()
       }))

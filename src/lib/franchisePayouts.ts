@@ -38,6 +38,73 @@ function getDailyAmount(dailyCommissions: any, level: number): number {
   return typeof dailyCommissions?.[key] === 'number' ? dailyCommissions[key] : 0;
 }
 
+async function createFranchisePayoutEntry({
+  session,
+  plan,
+  recipientId,
+  referredUserId,
+  level,
+  amount,
+  payoutDate,
+  description
+}: {
+  session: mongoose.ClientSession;
+  plan: any;
+  recipientId: mongoose.Types.ObjectId;
+  referredUserId: mongoose.Types.ObjectId;
+  level: number;
+  amount: number;
+  payoutDate: Date;
+  description: string;
+}) {
+  const recipient = await User.findById(recipientId).session(session);
+  if (!recipient || amount <= 0) {
+    return false;
+  }
+
+  const balanceBefore = recipient.walletBalance;
+
+  const commission = await Commission.create([{
+    user: recipient._id,
+    referredUser: referredUserId,
+    commissionType: 'franchise_daily',
+    level,
+    amount,
+    description
+  }], { session });
+
+  await User.findByIdAndUpdate(recipient._id, {
+    $inc: {
+      walletBalance: amount,
+      totalCommissionEarned: amount
+    }
+  }, { session });
+
+  const transaction = await Transaction.create([{
+    user: recipient._id,
+    type: 'credit',
+    amount,
+    reason: 'franchise_daily',
+    description,
+    balanceBefore,
+    balanceAfter: balanceBefore + amount
+  }], { session });
+
+  await FranchiseDailyPayout.create([{
+    plan: plan._id,
+    franchiseKey: plan.franchiseKey,
+    paidTo: recipient._id,
+    referredUser: referredUserId,
+    level,
+    amount,
+    payoutDate,
+    commission: commission[0]?._id,
+    transaction: transaction[0]?._id
+  }], { session });
+
+  return true;
+}
+
 export async function runDailyFranchisePayouts(input?: { date?: string | Date; limit?: number }) {
   const payoutDate = toDateOnly(input?.date);
   const limit = input?.limit && input.limit > 0 ? input.limit : undefined;
@@ -92,57 +159,64 @@ export async function runDailyFranchisePayouts(input?: { date?: string | Date; l
 
     try {
       const owner = await User.findById(plan.owner).select('referredBy').session(session);
-      let currentReferrerId = owner?.referredBy;
+      if (!owner) {
+        throw new Error('Payout plan owner not found');
+      }
+
+      let currentReferrerId = owner.referredBy;
 
       let planPaid = 0;
       let planRecipients = 0;
 
-      for (let level = 1; level <= plan.maxLevels && currentReferrerId; level++) {
-        const referrer = await User.findById(currentReferrerId).session(session);
-        if (!referrer) break;
-
+      for (let level = 1; level <= plan.maxLevels; level++) {
         const amount = getDailyAmount(plan.dailyCommissions, level);
-        if (amount > 0) {
-          const balanceBefore = referrer.walletBalance;
+        if (amount <= 0) {
+          if (level > 1 && !currentReferrerId) {
+            break;
+          }
+          continue;
+        }
 
-          const commission = await Commission.create([{
-            user: referrer._id,
-            referredUser: plan.owner,
-            commissionType: 'franchise_daily',
-            level,
-            amount,
-            description: `Level ${level} daily franchise payout`
-          }], { session });
-
-          await User.findByIdAndUpdate(referrer._id, {
-            $inc: {
-              walletBalance: amount,
-              totalCommissionEarned: amount
-            }
-          }, { session });
-
-          const transaction = await Transaction.create([{
-            user: referrer._id,
-            type: 'credit',
-            amount,
-            reason: 'franchise_daily',
-            description: `Level ${level} franchise daily payout`,
-            balanceBefore,
-            balanceAfter: balanceBefore + amount
-          }], { session });
-
-          await FranchiseDailyPayout.create([{
-            plan: plan._id,
-            franchiseKey: plan.franchiseKey,
-            paidTo: referrer._id,
-            referredUser: plan.owner,
+        if (level === 1) {
+          const created = await createFranchisePayoutEntry({
+            session,
+            plan,
+            recipientId: owner._id,
+            referredUserId: owner._id,
             level,
             amount,
             payoutDate,
-            commission: commission[0]?._id,
-            transaction: transaction[0]?._id
-          }], { session });
+            description: 'Level 1 franchise daily payout for key purchaser'
+          });
 
+          if (created) {
+            planPaid += amount;
+            planRecipients += 1;
+          }
+          continue;
+        }
+
+        if (!currentReferrerId) {
+          break;
+        }
+
+        const referrer = await User.findById(currentReferrerId).select('referredBy').session(session);
+        if (!referrer) {
+          break;
+        }
+
+        const created = await createFranchisePayoutEntry({
+          session,
+          plan,
+          recipientId: referrer._id,
+          referredUserId: owner._id,
+          level,
+          amount,
+          payoutDate,
+          description: `Level ${level} franchise daily payout`
+        });
+
+        if (created) {
           planPaid += amount;
           planRecipients += 1;
         }

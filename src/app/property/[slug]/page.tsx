@@ -38,6 +38,7 @@ export default function PropertySharePage() {
   const [email, setEmail] = useState('');
   const [address, setAddress] = useState('');
   const [requiresLoan, setRequiresLoan] = useState(false);
+  const [loanAmount, setLoanAmount] = useState('');
   const [pan, setPan] = useState('');
   const [aadhaar, setAadhaar] = useState('');
   const [panCard, setPanCard] = useState<File | null>(null);
@@ -117,6 +118,10 @@ export default function PropertySharePage() {
     }
 
     if (requiresLoan) {
+      if (!loanAmount.trim() || Number(loanAmount) <= 0) {
+        setFormError('Please enter the required loan amount.');
+        return;
+      }
       if (!pan.trim() || !aadhaar.trim()) {
         setFormError('Please enter PAN and Aadhaar for the loan application.');
         return;
@@ -139,6 +144,7 @@ export default function PropertySharePage() {
           email: email.trim(),
           address: address.trim(),
           requiresLoan,
+          loanAmount: requiresLoan ? Number(loanAmount) : undefined,
           propertyId: ad.id,
           referralCode: referralCode || undefined
         })
@@ -157,6 +163,7 @@ export default function PropertySharePage() {
         formData.append('name', name.trim());
         formData.append('contactNumber', contactNumber.trim());
         formData.append('email', email.trim());
+        formData.append('loanAmount', loanAmount.trim());
         formData.append('pan', pan.trim().toUpperCase());
         formData.append('aadhaar', aadhaar.trim());
         formData.append('propertyId', ad.id);
@@ -186,6 +193,7 @@ export default function PropertySharePage() {
       setEmail('');
       setAddress('');
       setRequiresLoan(false);
+      setLoanAmount('');
       setPan('');
       setAadhaar('');
       setPanCard(null);
@@ -343,6 +351,7 @@ export default function PropertySharePage() {
                         if (!checked) {
                           setPan('');
                           setAadhaar('');
+                          setLoanAmount('');
                           setPanCard(null);
                           setAadhaarCard(null);
                           setBankStatement(null);
@@ -357,6 +366,17 @@ export default function PropertySharePage() {
               {requiresLoan && (
                 <div className="space-y-4 rounded-2xl border border-emerald-500/20 bg-emerald-500/5 p-4">
                   <p className="text-sm font-semibold text-emerald-200">Loan KYC Details</p>
+                  <div className="space-y-2">
+                    <label className="text-sm font-semibold text-slate-300">Loan Amount</label>
+                    <input
+                      type="number"
+                      min="1"
+                      value={loanAmount}
+                      onChange={(event) => setLoanAmount(event.target.value)}
+                      placeholder="Enter required loan amount"
+                      className="w-full rounded-2xl border border-slate-700 bg-slate-950/60 px-4 py-3 text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                    />
+                  </div>
                   <div className="grid gap-4 md:grid-cols-2">
                     <div className="space-y-2">
                       <label className="text-sm font-semibold text-slate-300">PAN</label>
