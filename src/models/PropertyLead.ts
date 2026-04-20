@@ -6,6 +6,7 @@ export interface IPropertyLead extends Document {
   email: string;
   address: string;
   requiresLoan: boolean;
+  loanAmount?: number;
   property: mongoose.Types.ObjectId;
   referralCode?: string;
   createdAt: Date;
@@ -41,6 +42,10 @@ const PropertyLeadSchema: Schema = new Schema({
   requiresLoan: {
     type: Boolean,
     default: false
+  },
+  loanAmount: {
+    type: Number,
+    min: [1, 'Loan amount must be greater than zero']
   },
   property: {
     type: mongoose.Schema.Types.ObjectId,

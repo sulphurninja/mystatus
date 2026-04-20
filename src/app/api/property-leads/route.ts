@@ -13,6 +13,9 @@ export async function POST(request: NextRequest) {
     const propertyId = typeof body.propertyId === 'string' ? body.propertyId.trim() : '';
     const referralCode = typeof body.referralCode === 'string' ? body.referralCode.trim() : '';
     const requiresLoan = typeof body.requiresLoan === 'boolean' ? body.requiresLoan : false;
+    const loanAmount = body.loanAmount === null || body.loanAmount === undefined || body.loanAmount === ''
+      ? undefined
+      : Number(body.loanAmount);
 
     if (!name || !contactNumber || !email || !address || !propertyId) {
       return NextResponse.json(
@@ -24,6 +27,13 @@ export async function POST(request: NextRequest) {
     if (!propertyId.match(/^[0-9a-fA-F]{24}$/)) {
       return NextResponse.json(
         { success: false, message: 'Invalid property ID format' },
+        { status: 400 }
+      );
+    }
+
+    if (requiresLoan && (!Number.isFinite(loanAmount) || (loanAmount as number) <= 0)) {
+      return NextResponse.json(
+        { success: false, message: 'Valid loan amount is required when requesting a loan' },
         { status: 400 }
       );
     }
@@ -44,6 +54,7 @@ export async function POST(request: NextRequest) {
       email: email.toLowerCase(),
       address,
       requiresLoan,
+      loanAmount: requiresLoan ? loanAmount : undefined,
       property: propertyId,
       referralCode: referralCode || undefined
     });

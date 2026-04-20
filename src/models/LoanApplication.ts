@@ -4,6 +4,7 @@ export interface ILoanApplication extends Document {
   name: string;
   contactNumber: string;
   email: string;
+  loanAmount: number;
   pan: string;
   aadhaar: string;
   property: mongoose.Types.ObjectId;
@@ -11,6 +12,9 @@ export interface ILoanApplication extends Document {
   panCardUrl: string;
   aadhaarCardUrl: string;
   bankStatementUrl: string;
+  status: 'pending' | 'approved' | 'rejected';
+  reviewedAt?: Date;
+  reviewedBy?: mongoose.Types.ObjectId;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -34,6 +38,11 @@ const LoanApplicationSchema: Schema = new Schema({
     trim: true,
     lowercase: true,
     maxlength: [100, 'Email cannot be more than 100 characters']
+  },
+  loanAmount: {
+    type: Number,
+    required: [true, 'Loan amount is required'],
+    min: [1, 'Loan amount must be greater than zero']
   },
   pan: {
     type: String,
@@ -68,6 +77,19 @@ const LoanApplicationSchema: Schema = new Schema({
   bankStatementUrl: {
     type: String,
     required: [true, 'Bank statement upload is required']
+  },
+  status: {
+    type: String,
+    enum: ['pending', 'approved', 'rejected'],
+    default: 'pending',
+    index: true
+  },
+  reviewedAt: {
+    type: Date
+  },
+  reviewedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
   }
 }, {
   timestamps: true

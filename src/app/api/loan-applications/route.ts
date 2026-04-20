@@ -25,12 +25,13 @@ const sanitizeText = (value: FormDataEntryValue | null) =>
 const uploadToCloudinary = async (file: File, folder: string) => {
   const bytes = await file.arrayBuffer();
   const buffer = Buffer.from(bytes);
+  const isPdf = file.type === 'application/pdf';
 
   const uploadResult: any = await new Promise((resolve, reject) => {
     const uploadStream = cloudinary.uploader.upload_stream(
       {
         folder,
-        resource_type: 'auto',
+        resource_type: isPdf ? 'raw' : 'image',
         ...(file.type.startsWith('image/') && {
           transformation: [
             { width: 1600, height: 1600, crop: 'limit' },
@@ -57,18 +58,27 @@ export async function POST(request: NextRequest) {
     const name = sanitizeText(formData.get('name'));
     const contactNumber = sanitizeText(formData.get('contactNumber'));
     const email = sanitizeText(formData.get('email'));
+    const loanAmountValue = sanitizeText(formData.get('loanAmount'));
     const pan = sanitizeText(formData.get('pan'));
     const aadhaar = sanitizeText(formData.get('aadhaar'));
     const propertyId = sanitizeText(formData.get('propertyId'));
     const referralCode = sanitizeText(formData.get('referralCode'));
+    const loanAmount = Number(loanAmountValue);
 
     const panCard = formData.get('panCard');
     const aadhaarCard = formData.get('aadhaarCard');
     const bankStatement = formData.get('bankStatement');
 
-    if (!name || !contactNumber || !email || !pan || !aadhaar || !propertyId) {
+    if (!name || !contactNumber || !email || !pan || !aadhaar || !propertyId || !loanAmountValue) {
       return NextResponse.json(
         { success: false, message: 'All personal details are required' },
+        { status: 400 }
+      );
+    }
+
+    if (!Number.isFinite(loanAmount) || loanAmount <= 0) {
+      return NextResponse.json(
+        { success: false, message: 'Please enter a valid loan amount' },
         { status: 400 }
       );
     }
@@ -128,6 +138,7 @@ export async function POST(request: NextRequest) {
       name,
       contactNumber,
       email: email.toLowerCase(),
+      loanAmount,
       pan,
       aadhaar,
       property: propertyId,
