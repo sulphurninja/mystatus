@@ -29,6 +29,9 @@ export async function PUT(
     }
 
     advertisement.isActive = !advertisement.isActive;
+    if (advertisement.isActive) {
+      advertisement.activatedAt = new Date();
+    }
     await advertisement.save();
 
     return NextResponse.json({
@@ -37,6 +40,7 @@ export async function PUT(
       advertisement: {
         _id: advertisement._id,
         isActive: advertisement.isActive,
+        activatedAt: advertisement.activatedAt || (advertisement.isActive ? advertisement.createdAt : null),
       }
     });
 

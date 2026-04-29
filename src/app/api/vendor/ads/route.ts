@@ -22,7 +22,19 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      ads
+      ads: ads.map((ad) => ({
+        _id: ad._id,
+        title: ad.title,
+        description: ad.description,
+        image: ad.image,
+        rewardAmount: ad.rewardAmount,
+        isActive: ad.isActive,
+        totalShares: ad.totalShares,
+        totalVerifiedShares: ad.totalVerifiedShares,
+        totalRewardsPaid: ad.totalRewardsPaid,
+        createdAt: ad.createdAt,
+        activatedAt: ad.activatedAt || (ad.isActive ? ad.createdAt : null)
+      }))
     });
   } catch (error: any) {
     console.error('Get vendor ads error:', error);
@@ -83,6 +95,7 @@ export async function POST(request: NextRequest) {
       rewardAmount,
       vendor: vendor._id,
       verificationPeriodHours: verificationPeriodHours || 8,
+      activatedAt: new Date(),
       commissionEnabled: !!commissionEnabled,
       commissionNote: commissionNote ? String(commissionNote).trim().slice(0, 200) : ''
     });

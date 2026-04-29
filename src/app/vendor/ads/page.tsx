@@ -15,6 +15,7 @@ interface Ad {
   totalVerifiedShares: number;
   totalRewardsPaid: number;
   createdAt: string;
+  activatedAt?: string | null;
 }
 
 export default function VendorAdsPage() {
@@ -61,6 +62,17 @@ export default function VendorAdsPage() {
       console.error('Error loading profile:', e);
     }
   };
+
+  const formatDateTime = (value?: string | null) =>
+    value
+      ? new Date(value).toLocaleString('en-IN', {
+          day: 'numeric',
+          month: 'short',
+          year: 'numeric',
+          hour: 'numeric',
+          minute: '2-digit'
+        })
+      : 'Not active yet';
 
   return (
     <div className="p-6 lg:p-8 space-y-8">
@@ -161,9 +173,16 @@ export default function VendorAdsPage() {
                   </div>
                 </div>
 
-                <p className="text-slate-500 text-xs pt-2">
-                  Created {new Date(ad.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
-                </p>
+                <div className="rounded-xl bg-slate-700/20 p-3 space-y-1 text-xs">
+                  <p className="flex items-center justify-between gap-3">
+                    <span className="text-slate-500">Uploaded</span>
+                    <span className="text-slate-300">{formatDateTime(ad.createdAt)}</span>
+                  </p>
+                  <p className="flex items-center justify-between gap-3">
+                    <span className="text-slate-500">Fully Active</span>
+                    <span className={ad.isActive ? 'text-emerald-300' : 'text-slate-400'}>{formatDateTime(ad.activatedAt)}</span>
+                  </p>
+                </div>
               </div>
             </div>
           ))}

@@ -61,6 +61,7 @@ export async function PUT(
         commissionEnabled: !!advertisement.commissionEnabled,
         commissionNote: advertisement.commissionNote || '',
         createdAt: advertisement.createdAt,
+        activatedAt: advertisement.activatedAt || (advertisement.isActive ? advertisement.createdAt : null)
       }
     });
 

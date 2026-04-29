@@ -36,7 +36,8 @@ export async function GET(request: NextRequest) {
         verificationPeriodHours: ad.verificationPeriodHours,
         commissionEnabled: !!ad.commissionEnabled,
         commissionNote: ad.commissionNote || '',
-        createdAt: ad.createdAt
+        createdAt: ad.createdAt,
+        activatedAt: ad.activatedAt || (ad.isActive ? ad.createdAt : null)
       }))
     });
 
@@ -97,6 +98,7 @@ export async function POST(request: NextRequest) {
       rewardAmount: parseFloat(rewardAmount),
       vendor: vendorId,
       verificationPeriodHours: verificationPeriodHours !== undefined ? parseInt(verificationPeriodHours) : 8,
+      activatedAt: new Date(),
       commissionEnabled: !!commissionEnabled,
       commissionNote: commissionNote ? String(commissionNote).trim().slice(0, 200) : ''
     });
@@ -124,7 +126,8 @@ export async function POST(request: NextRequest) {
         verificationPeriodHours: populatedAd!.verificationPeriodHours,
         commissionEnabled: !!populatedAd!.commissionEnabled,
         commissionNote: populatedAd!.commissionNote || '',
-        createdAt: populatedAd!.createdAt
+        createdAt: populatedAd!.createdAt,
+        activatedAt: populatedAd!.activatedAt || populatedAd!.createdAt
       }
     });
 
