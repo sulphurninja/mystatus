@@ -11,9 +11,9 @@ type LoanApplication = {
   pan: string;
   aadhaar: string;
   referralCode?: string;
-  panCardUrl: string;
-  aadhaarCardUrl: string;
-  bankStatementUrl: string;
+  panCardUrl?: string;
+  aadhaarCardUrl?: string;
+  bankStatementUrl?: string;
   status: 'pending' | 'approved' | 'rejected';
   reviewedAt?: string;
   createdAt: string;
@@ -78,6 +78,9 @@ export default function LoanApplicationsPage() {
 
   const getDocumentViewUrl = (url: string) =>
     `/api/document-view?url=${encodeURIComponent(url)}`;
+
+  const getDocumentCount = (application: LoanApplication) =>
+    [application.panCardUrl, application.aadhaarCardUrl, application.bankStatementUrl].filter(Boolean).length;
 
   const updateStatus = async (id: string, status: 'approved' | 'rejected') => {
     try {
@@ -217,6 +220,7 @@ export default function LoanApplicationsPage() {
                   <th className="px-6 py-3">Contact</th>
                   <th className="px-6 py-3">Property</th>
                   <th className="px-6 py-3">Loan Amount</th>
+                  <th className="px-6 py-3">Documents</th>
                   <th className="px-6 py-3">Status</th>
                   <th className="px-6 py-3">Submitted</th>
                   <th className="px-6 py-3 text-right">Actions</th>
@@ -243,6 +247,15 @@ export default function LoanApplicationsPage() {
                     <td className="px-6 py-4">{application.contactNumber}</td>
                     <td className="px-6 py-4">{application.property?.title || 'Unknown'}</td>
                     <td className="px-6 py-4">{formatLoanAmount(application.loanAmount)}</td>
+                    <td className="px-6 py-4">
+                      <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-semibold border ${
+                        getDocumentCount(application) === 3
+                          ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-200'
+                          : 'bg-amber-500/15 border-amber-500/30 text-amber-200'
+                      }`}>
+                        {getDocumentCount(application)}/3 files
+                      </span>
+                    </td>
                     <td className="px-6 py-4">
                       <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-semibold border capitalize ${statusStyles[application.status]}`}>
                         {application.status}
@@ -352,15 +365,33 @@ export default function LoanApplicationsPage() {
             </div>
 
             <div className="grid gap-4 md:grid-cols-3 text-sm">
-              <a href={getDocumentViewUrl(selectedApplication.panCardUrl)} target="_blank" rel="noopener noreferrer" className="rounded-2xl border border-slate-800/80 bg-slate-900/60 p-4 text-emerald-300 hover:text-emerald-200 underline">
-                View PAN Card
-              </a>
-              <a href={getDocumentViewUrl(selectedApplication.aadhaarCardUrl)} target="_blank" rel="noopener noreferrer" className="rounded-2xl border border-slate-800/80 bg-slate-900/60 p-4 text-emerald-300 hover:text-emerald-200 underline">
-                View Aadhaar Card
-              </a>
-              <a href={getDocumentViewUrl(selectedApplication.bankStatementUrl)} target="_blank" rel="noopener noreferrer" className="rounded-2xl border border-slate-800/80 bg-slate-900/60 p-4 text-emerald-300 hover:text-emerald-200 underline">
-                View Bank Statement
-              </a>
+              {selectedApplication.panCardUrl ? (
+                <a href={getDocumentViewUrl(selectedApplication.panCardUrl)} target="_blank" rel="noopener noreferrer" className="rounded-2xl border border-slate-800/80 bg-slate-900/60 p-4 text-emerald-300 hover:text-emerald-200 underline">
+                  View PAN Card
+                </a>
+              ) : (
+                <div className="rounded-2xl border border-slate-800/80 bg-slate-900/60 p-4 text-slate-400">
+                  PAN Card not available
+                </div>
+              )}
+              {selectedApplication.aadhaarCardUrl ? (
+                <a href={getDocumentViewUrl(selectedApplication.aadhaarCardUrl)} target="_blank" rel="noopener noreferrer" className="rounded-2xl border border-slate-800/80 bg-slate-900/60 p-4 text-emerald-300 hover:text-emerald-200 underline">
+                  View Aadhaar Card
+                </a>
+              ) : (
+                <div className="rounded-2xl border border-slate-800/80 bg-slate-900/60 p-4 text-slate-400">
+                  Aadhaar Card not available
+                </div>
+              )}
+              {selectedApplication.bankStatementUrl ? (
+                <a href={getDocumentViewUrl(selectedApplication.bankStatementUrl)} target="_blank" rel="noopener noreferrer" className="rounded-2xl border border-slate-800/80 bg-slate-900/60 p-4 text-emerald-300 hover:text-emerald-200 underline">
+                  View Bank Statement
+                </a>
+              ) : (
+                <div className="rounded-2xl border border-slate-800/80 bg-slate-900/60 p-4 text-slate-400">
+                  Bank Statement not available
+                </div>
+              )}
             </div>
 
             {selectedApplication.status === 'pending' && (

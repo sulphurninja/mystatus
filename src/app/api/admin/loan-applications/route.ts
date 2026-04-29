@@ -5,6 +5,39 @@ import LoanApplication from '@/models/LoanApplication';
 import PropertyLead from '@/models/PropertyLead';
 import { authenticateRequest } from '@/middleware/auth';
 
+const getStringValue = (...values: unknown[]) => {
+  for (const value of values) {
+    if (typeof value === 'string' && value.trim()) {
+      return value.trim();
+    }
+  }
+  return '';
+};
+
+const getApplicationDocumentUrls = (application: any) => ({
+  panCardUrl: getStringValue(
+    application.panCardUrl,
+    application.documents?.panCardUrl,
+    application.documents?.panCard,
+    application.documents?.pan,
+    application.panCard?.url
+  ),
+  aadhaarCardUrl: getStringValue(
+    application.aadhaarCardUrl,
+    application.documents?.aadhaarCardUrl,
+    application.documents?.aadhaarCard,
+    application.documents?.aadhaar,
+    application.aadhaarCard?.url
+  ),
+  bankStatementUrl: getStringValue(
+    application.bankStatementUrl,
+    application.documents?.bankStatementUrl,
+    application.documents?.bankStatement,
+    application.documents?.bank,
+    application.bankStatement?.url
+  )
+});
+
 export async function GET(request: NextRequest) {
   try {
     const auth = authenticateRequest(request, ['admin']);
@@ -77,6 +110,7 @@ export async function GET(request: NextRequest) {
       success: true,
       data: applications.map((application: any) => {
         const matchingLead = leadMap.get(`${application.email}|${application.contactNumber}`);
+        const documentUrls = getApplicationDocumentUrls(application);
         const loanAmount = typeof application.loanAmount === 'number'
           ? application.loanAmount
           : typeof matchingLead?.loanAmount === 'number'
@@ -92,9 +126,9 @@ export async function GET(request: NextRequest) {
           pan: application.pan,
           aadhaar: application.aadhaar,
           referralCode: application.referralCode || '',
-          panCardUrl: application.panCardUrl,
-          aadhaarCardUrl: application.aadhaarCardUrl,
-          bankStatementUrl: application.bankStatementUrl,
+          panCardUrl: documentUrls.panCardUrl,
+          aadhaarCardUrl: documentUrls.aadhaarCardUrl,
+          bankStatementUrl: documentUrls.bankStatementUrl,
           status: application.status || 'pending',
           reviewedAt: application.reviewedAt,
           property: application.property

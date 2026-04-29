@@ -21,6 +21,7 @@ interface Advertisement {
   commissionEnabled?: boolean;
   commissionNote?: string;
   createdAt: string;
+  activatedAt?: string | null;
 }
 
 export default function AdvertisementsPage() {
@@ -173,9 +174,14 @@ export default function AdvertisementsPage() {
       });
 
       if (response.ok) {
+        const result = await response.json();
         setAdvertisements(prev => prev.map(ad =>
           ad._id === adId
-            ? { ...ad, isActive: !ad.isActive }
+            ? {
+                ...ad,
+                isActive: !!result?.advertisement?.isActive,
+                activatedAt: result?.advertisement?.activatedAt ?? ad.activatedAt
+              }
             : ad
         ));
       }
@@ -266,6 +272,17 @@ export default function AdvertisementsPage() {
     ad.vendor.businessName.toLowerCase().includes(searchTerm.toLowerCase()) ||
     ad.description.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  const formatDateTime = (value?: string | null) =>
+    value
+      ? new Date(value).toLocaleString('en-IN', {
+          day: 'numeric',
+          month: 'short',
+          year: 'numeric',
+          hour: 'numeric',
+          minute: '2-digit'
+        })
+      : 'Not active yet';
 
   return (
     <div className="p-6 lg:p-8 space-y-8">
@@ -482,38 +499,53 @@ export default function AdvertisementsPage() {
                 </div>
               </div>
 
-              {/* Status Badge */}
-              <div className="flex items-center justify-between">
-                <div className={`px-3 py-1 rounded-full text-xs font-semibold ${ad.isActive
-                  ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                  : 'bg-red-500/20 text-red-400 border border-red-500/30'
-                  }`}>
-                  {ad.isActive ? 'Active' : 'Inactive'}
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 gap-2 rounded-xl bg-slate-700/20 p-3 text-xs">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-slate-400">Uploaded</span>
+                    <span className="font-medium text-slate-200">{formatDateTime(ad.createdAt)}</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-slate-400">Fully Active</span>
+                    <span className={`font-medium ${ad.isActive ? 'text-emerald-300' : 'text-slate-400'}`}>
+                      {formatDateTime(ad.activatedAt)}
+                    </span>
+                  </div>
                 </div>
 
-                {/* Actions */}
-                <div className="flex space-x-2">
-                  <button
-                    onClick={() => toggleAdStatus(ad._id)}
-                    className={`px-3 py-2 rounded-xl text-xs font-medium transition-all duration-200 ${ad.isActive
-                      ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30 border border-red-500/30'
-                      : 'bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 border border-emerald-500/30'
-                      }`}
-                  >
-                    {ad.isActive ? 'Deactivate' : 'Activate'}
-                  </button>
-                  <button
-                    onClick={() => editAd(ad)}
-                    className="px-3 py-2 bg-blue-500/20 text-blue-400 hover:bg-blue-500/30 rounded-xl text-xs font-medium transition-all duration-200 border border-blue-500/30"
-                  >
-                    Edit
-                  </button>
-                  <button
-                    onClick={() => deleteAd(ad._id)}
-                    className="px-3 py-2 bg-red-500/20 text-red-400 hover:bg-red-500/30 rounded-xl text-xs font-medium transition-all duration-200 border border-red-500/30"
-                  >
-                    Delete
-                  </button>
+                {/* Status Badge */}
+                <div className="flex items-center justify-between">
+                  <div className={`px-3 py-1 rounded-full text-xs font-semibold ${ad.isActive
+                    ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                    : 'bg-red-500/20 text-red-400 border border-red-500/30'
+                    }`}>
+                    {ad.isActive ? 'Active' : 'Inactive'}
+                  </div>
+
+                  {/* Actions */}
+                  <div className="flex space-x-2">
+                    <button
+                      onClick={() => toggleAdStatus(ad._id)}
+                      className={`px-3 py-2 rounded-xl text-xs font-medium transition-all duration-200 ${ad.isActive
+                        ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30 border border-red-500/30'
+                        : 'bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 border border-emerald-500/30'
+                        }`}
+                    >
+                      {ad.isActive ? 'Deactivate' : 'Activate'}
+                    </button>
+                    <button
+                      onClick={() => editAd(ad)}
+                      className="px-3 py-2 bg-blue-500/20 text-blue-400 hover:bg-blue-500/30 rounded-xl text-xs font-medium transition-all duration-200 border border-blue-500/30"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      onClick={() => deleteAd(ad._id)}
+                      className="px-3 py-2 bg-red-500/20 text-red-400 hover:bg-red-500/30 rounded-xl text-xs font-medium transition-all duration-200 border border-red-500/30"
+                    >
+                      Delete
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>

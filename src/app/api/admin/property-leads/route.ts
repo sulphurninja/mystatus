@@ -4,6 +4,39 @@ import PropertyLead from '@/models/PropertyLead';
 import LoanApplication from '@/models/LoanApplication';
 import { authenticateRequest } from '@/middleware/auth';
 
+const getStringValue = (...values: unknown[]) => {
+  for (const value of values) {
+    if (typeof value === 'string' && value.trim()) {
+      return value.trim();
+    }
+  }
+  return '';
+};
+
+const getApplicationDocumentUrls = (application: any) => ({
+  panCardUrl: getStringValue(
+    application.panCardUrl,
+    application.documents?.panCardUrl,
+    application.documents?.panCard,
+    application.documents?.pan,
+    application.panCard?.url
+  ),
+  aadhaarCardUrl: getStringValue(
+    application.aadhaarCardUrl,
+    application.documents?.aadhaarCardUrl,
+    application.documents?.aadhaarCard,
+    application.documents?.aadhaar,
+    application.aadhaarCard?.url
+  ),
+  bankStatementUrl: getStringValue(
+    application.bankStatementUrl,
+    application.documents?.bankStatementUrl,
+    application.documents?.bankStatement,
+    application.documents?.bank,
+    application.bankStatement?.url
+  )
+});
+
 export async function GET(request: NextRequest) {
   try {
     const auth = authenticateRequest(request, ['admin']);
@@ -73,13 +106,14 @@ export async function GET(request: NextRequest) {
           const key = `${lead.email}|${lead.contactNumber}`;
           const match = loanMap.get(key);
           if (!match) return null;
+          const documentUrls = getApplicationDocumentUrls(match);
           return {
             loanAmount: typeof match.loanAmount === 'number' ? match.loanAmount : lead.loanAmount,
             pan: match.pan,
             aadhaar: match.aadhaar,
-            panCardUrl: match.panCardUrl,
-            aadhaarCardUrl: match.aadhaarCardUrl,
-            bankStatementUrl: match.bankStatementUrl,
+            panCardUrl: documentUrls.panCardUrl,
+            aadhaarCardUrl: documentUrls.aadhaarCardUrl,
+            bankStatementUrl: documentUrls.bankStatementUrl,
             status: match.status || 'pending',
             createdAt: match.createdAt,
             reviewedAt: match.reviewedAt
