@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export interface JWTPayload {
   id: string;
-  type: 'user' | 'vendor' | 'admin';
+  type: 'user' | 'vendor' | 'admin' | 'verification';
 }
 
 export function verifyToken(token: string): JWTPayload | null {
@@ -23,7 +23,10 @@ export function getTokenFromRequest(request: NextRequest): string | null {
   return null;
 }
 
-export function authenticateRequest(request: NextRequest, allowedTypes: ('user' | 'vendor' | 'admin')[] = ['user', 'vendor', 'admin']) {
+export function authenticateRequest(
+  request: NextRequest,
+  allowedTypes: ('user' | 'vendor' | 'admin' | 'verification')[] = ['user', 'vendor', 'admin']
+) {
   const token = getTokenFromRequest(request);
 
   if (!token) {
@@ -55,7 +58,7 @@ export function authenticateRequest(request: NextRequest, allowedTypes: ('user' 
   };
 }
 
-export function generateToken(id: string, type: 'user' | 'vendor' | 'admin'): string {
+export function generateToken(id: string, type: 'user' | 'vendor' | 'admin' | 'verification'): string {
   return jwt.sign(
     { id, type },
     process.env.JWT_SECRET || 'fallback-secret',
