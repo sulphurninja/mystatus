@@ -40,12 +40,6 @@ const navigation = [
     current: false
   },
   {
-    name: 'Verifications',
-    href: '/admin/verifications',
-    icon: 'CheckCircle',
-    current: false
-  },
-  {
     name: 'Property Leads',
     href: '/admin/property-leads',
     icon: 'ClipboardList',
