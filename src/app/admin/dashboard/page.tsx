@@ -164,10 +164,10 @@ export default function AdminDashboard() {
       shadow: 'shadow-blue-500/20'
     },
     {
-      title: 'Review Verifications',
-      description: 'Approve pending shares',
+      title: 'Open Verification Panel',
+      description: 'Review pending shares',
       icon: 'CheckCircle',
-      href: '/admin/verifications',
+      href: '/verification',
       gradient: 'from-amber-500 to-orange-600',
       shadow: 'shadow-amber-500/20',
       badge: stats.pendingVerifications > 0 ? stats.pendingVerifications.toString() : null
