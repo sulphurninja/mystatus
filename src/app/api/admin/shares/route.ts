@@ -7,7 +7,7 @@ import { authenticateRequest } from '@/middleware/auth';
 
 export async function GET(request: NextRequest) {
   try {
-    const auth = authenticateRequest(request, ['admin']);
+    const auth = authenticateRequest(request, ['admin', 'verification']);
     if (auth.error) {
       return NextResponse.json(
         { success: false, message: auth.error.message },
@@ -61,7 +61,7 @@ export async function GET(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
   try {
-    const auth = authenticateRequest(request, ['admin']);
+    const auth = authenticateRequest(request, ['admin', 'verification']);
     if (auth.error) {
       return NextResponse.json(
         { success: false, message: auth.error.message },
