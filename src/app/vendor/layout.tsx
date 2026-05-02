@@ -1,8 +1,12 @@
 'use client';
 
 import { useEffect } from 'react';
+import dynamic from 'next/dynamic';
 import { useRouter, usePathname } from 'next/navigation';
-import VendorLayout from '@/components/vendor/VendorLayout';
+
+const VendorShell = dynamic(() => import('@/components/vendor/VendorLayout'), {
+  ssr: false,
+});
 
 export default function VendorLayoutWrapper({
   children,
@@ -25,5 +29,5 @@ export default function VendorLayoutWrapper({
     return <>{children}</>;
   }
 
-  return <VendorLayout>{children}</VendorLayout>;
+  return <VendorShell>{children}</VendorShell>;
 }
