@@ -38,6 +38,7 @@ export default function VerificationDashboard({
   const [searchQuery, setSearchQuery] = useState('');
   const [rejectionReason, setRejectionReason] = useState('');
   const [showTransactionModal, setShowTransactionModal] = useState(false);
+  const [selectedProofShare, setSelectedProofShare] = useState<Share | null>(null);
 
   useEffect(() => {
     loadShares();
@@ -161,6 +162,32 @@ export default function VerificationDashboard({
     )
     : shares;
 
+  const isDisplayableUrl = (url?: string) => !!url && (url.startsWith('http://') || url.startsWith('https://'));
+  const isVideoUrl = (url?: string) => !!url && (/\.(mp4|mov|m4v|webm)/i.test(url) || url.includes('video/upload'));
+  const getMaturityHours = (sharedAt?: string, verificationDeadline?: string) => {
+    if (!sharedAt || !verificationDeadline) return null;
+
+    const start = new Date(sharedAt).getTime();
+    const end = new Date(verificationDeadline).getTime();
+
+    if (Number.isNaN(start) || Number.isNaN(end) || end <= start) return null;
+
+    return Math.round((end - start) / (1000 * 60 * 60));
+  };
+  const formatDateTime = (value?: string) => {
+    if (!value) return 'N/A';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return 'N/A';
+
+    return date.toLocaleString([], {
+      day: 'numeric',
+      month: 'short',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true,
+    });
+  };
+
   return (
     <div className="min-h-screen bg-[#0f172a] p-6 lg:p-8 space-y-8 text-slate-200">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
@@ -272,49 +299,25 @@ export default function VerificationDashboard({
       ) : (
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
           {filteredShares.map((share) => (
-            <div key={share._id} className="group bg-slate-800/30 backdrop-blur-md rounded-[2.5rem] border border-slate-700/50 hover:border-indigo-500/40 transition-all duration-300 overflow-hidden flex flex-col md:flex-row">
-              <div className="md:w-64 h-64 md:h-auto relative bg-black/40 overflow-hidden">
+            <div key={share._id} className="group overflow-hidden rounded-[2rem] border border-slate-700/50 bg-gradient-to-br from-slate-900/95 via-slate-900/88 to-slate-800/85 shadow-[0_24px_80px_rgba(15,23,42,0.45)] transition-all duration-300 hover:-translate-y-1 hover:border-indigo-500/40">
+              <div className="flex h-full flex-col lg:flex-row">
+              <div className="relative aspect-[4/3] w-full overflow-hidden bg-black/40 lg:min-h-[520px] lg:w-[42%] lg:aspect-auto">
                 {(() => {
-                  const isDisplayableUrl = (url?: string) => url && (url.startsWith('http://') || url.startsWith('https://'));
-                  const isVideoUrl = (url?: string) => url && (url.match(/\.(mp4|mov|m4v|webm)/) || url.includes('video/upload'));
                   const displayProofImage = isDisplayableUrl(share.proofImage) ? share.proofImage : null;
                   const displayAdImage = isDisplayableUrl(share.advertisement?.image) ? share.advertisement.image : null;
-                  const imageToShow = displayProofImage || displayAdImage;
 
-                  if (displayProofImage && isVideoUrl(displayProofImage)) {
-                    return (
-                      <video
-                        src={displayProofImage}
-                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
-                        muted
-                        onMouseOver={(e) => e.currentTarget.play()}
-                        onMouseOut={(e) => e.currentTarget.pause()}
-                      />
-                    );
-                  }
-
-                  if (imageToShow) {
+                  if (displayAdImage) {
                     return (
                       <>
                         <img
-                          src={imageToShow}
-                          alt={displayProofImage ? 'Proof' : 'Advertisement'}
-                          className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
+                          src={displayAdImage}
+                          alt="Advertisement"
+                          className="h-full w-full object-cover object-center transition-transform duration-700 group-hover:scale-105"
                         />
-                        {!displayProofImage && displayAdImage && (
-                          <div className="absolute bottom-2 right-2 px-2 py-1 bg-black/60 backdrop-blur-sm rounded-lg text-xs text-slate-300 font-medium">
-                            Ad Image
-                          </div>
-                        )}
-                        {share.proofImage && !displayProofImage && (
-                          <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/70 backdrop-blur-sm">
-                            <svg className="w-12 h-12 text-orange-400 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-.833-2.694-.833-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                            </svg>
-                            <span className="text-orange-400 font-bold text-sm text-center px-4">Proof Upload Failed</span>
-                            <span className="text-orange-300/70 text-xs mt-1 text-center px-4">User needs to resubmit from app</span>
-                          </div>
-                        )}
+                        <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-slate-950/80 via-slate-950/20 to-transparent"></div>
+                        <div className="absolute bottom-4 right-4 rounded-full bg-black/60 px-3 py-1.5 text-xs font-medium text-slate-200 backdrop-blur-sm">
+                          Ad Image
+                        </div>
                       </>
                     );
                   }
@@ -340,41 +343,88 @@ export default function VerificationDashboard({
                 </div>
               </div>
 
-              <div className="flex-1 p-8 flex flex-col justify-between space-y-6">
-                <div className="space-y-4">
-                  <div className="flex items-center space-x-4">
-                    <div className="w-12 h-12 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl flex items-center justify-center text-lg font-bold shadow-lg">
+              <div className="flex flex-1 flex-col justify-between gap-6 p-6 sm:p-7 lg:p-8">
+                {(() => {
+                  const maturityHours = getMaturityHours(share.sharedAt, share.verificationDeadline);
+
+                  return (
+                    <>
+                <div className="space-y-5">
+                  <div className="flex items-center gap-4">
+                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 text-lg font-bold shadow-lg">
                       {share.user?.name?.charAt(0) || 'U'}
                     </div>
-                    <div>
-                      <h3 className="text-xl font-bold text-white group-hover:text-indigo-400 transition-colors">
+                    <div className="min-w-0">
+                      <h3 className="truncate text-xl font-bold text-white transition-colors group-hover:text-indigo-300">
                         {share.user?.name || 'Anonymous User'}
                       </h3>
-                      <p className="text-sm text-slate-400 font-medium">
+                      <p className="text-sm font-medium leading-6 text-slate-400">
                         Shared on {new Date(share.sharedAt).toLocaleDateString()} at {new Date(share.sharedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true })}
                       </p>
                     </div>
                   </div>
 
-                  <div className="bg-slate-900/40 rounded-2xl p-4 border border-slate-700/30">
+                  <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="rounded-2xl border border-slate-700/40 bg-slate-900/40 p-4">
                     <p className="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-1">Advertisement</p>
                     <p className="text-slate-200 font-medium line-clamp-1">{share.advertisement?.title}</p>
                   </div>
 
-                  <div className="flex items-center justify-between">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (isDisplayableUrl(share.proofImage)) {
+                        setSelectedProofShare(share);
+                      }
+                    }}
+                    className={`rounded-2xl border border-slate-700/40 bg-slate-900/40 p-4 text-left transition-all ${
+                      isDisplayableUrl(share.proofImage)
+                        ? 'hover:border-emerald-500/40 hover:bg-slate-900/70'
+                        : 'cursor-default'
+                    }`}
+                  >
+                    <p className="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-1">Proof</p>
+                    <p className="text-slate-200 font-medium">
+                      {isDisplayableUrl(share.proofImage)
+                        ? isVideoUrl(share.proofImage)
+                          ? 'User submitted a proof video'
+                          : 'User submitted a proof image'
+                        : share.proofImage
+                          ? 'Proof file is invalid. Ask the user to resubmit.'
+                          : 'No proof submitted yet'}
+                    </p>
+                    {isDisplayableUrl(share.proofImage) && (
+                      <p className="mt-3 text-xs font-semibold text-emerald-400">Click to view proof</p>
+                    )}
+                  </button>
+                  </div>
+
+                  <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto]">
+                  <div className="rounded-2xl border border-slate-700/40 bg-slate-900/40 p-4">
+                    <p className="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-1">Maturity Time</p>
+                    <p className="text-slate-200 font-medium">
+                      {maturityHours ? `${maturityHours}h` : 'Not available'}
+                    </p>
+                    <p className="text-xs text-slate-400 mt-1">
+                      Deadline: {formatDateTime(share.verificationDeadline)}
+                    </p>
+                  </div>
+
+                  <div className="flex items-center rounded-2xl border border-indigo-500/20 bg-indigo-500/10 px-4 py-4 sm:min-w-[140px] sm:justify-center">
                     <div className="flex items-center space-x-2">
-                      <div className="w-2 h-2 bg-indigo-500 rounded-full animate-pulse"></div>
-                      <span className="text-sm font-semibold text-indigo-400">Reward: {share.rewardAmount}</span>
+                      <div className="h-2 w-2 rounded-full bg-indigo-500 animate-pulse"></div>
+                      <span className="text-sm font-semibold text-indigo-300">Reward: {share.rewardAmount}</span>
                     </div>
+                  </div>
                   </div>
                 </div>
 
-                <div className="flex items-center space-x-3 mt-auto">
+                <div className="mt-auto flex items-center gap-3 pt-2">
                   {share.status === 'pending' ? (
                     <>
                       <button
                         onClick={() => handleVerify(share._id)}
-                        className="flex-1 h-12 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white rounded-2xl font-bold shadow-lg shadow-emerald-500/20 transition-all duration-300 hover:-translate-y-1 active:scale-95"
+                        className="h-12 flex-1 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-600 font-bold text-white shadow-lg shadow-emerald-500/20 transition-all duration-300 hover:-translate-y-1 hover:from-emerald-600 hover:to-teal-700 active:scale-95"
                       >
                         Approve
                       </button>
@@ -383,13 +433,13 @@ export default function VerificationDashboard({
                           setSelectedShare(share);
                           setShowTransactionModal(true);
                         }}
-                        className="flex-1 h-12 bg-slate-700/50 hover:bg-slate-700 text-white rounded-2xl font-bold border border-slate-600/50 transition-all duration-300 hover:-translate-y-1 active:scale-95"
+                        className="h-12 flex-1 rounded-2xl border border-slate-600/50 bg-slate-700/50 font-bold text-white transition-all duration-300 hover:-translate-y-1 hover:bg-slate-700 active:scale-95"
                       >
                         Reject
                       </button>
                     </>
                   ) : (
-                    <div className={`w-full h-12 flex items-center justify-center rounded-2xl font-bold text-sm uppercase tracking-widest border ${share.status === 'verified'
+                    <div className={`flex h-12 w-full items-center justify-center rounded-2xl border text-sm font-bold uppercase tracking-widest ${share.status === 'verified'
                       ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'
                       : 'bg-rose-500/10 text-rose-500 border-rose-500/20'
                       }`}>
@@ -397,9 +447,59 @@ export default function VerificationDashboard({
                     </div>
                   )}
                 </div>
+                    </>
+                  );
+                })()}
+              </div>
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {selectedProofShare && (
+        <div className="fixed inset-0 z-[65] flex items-center justify-center p-6">
+          <div
+            className="absolute inset-0 bg-slate-950/85 backdrop-blur-xl"
+            onClick={() => setSelectedProofShare(null)}
+          ></div>
+          <div className="relative w-full max-w-5xl overflow-hidden rounded-[2rem] border border-slate-700/60 bg-slate-900 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-800 px-6 py-4">
+              <div>
+                <h3 className="text-xl font-bold text-white">Submitted Proof</h3>
+                <p className="text-sm text-slate-400">{selectedProofShare.user?.name || 'User'} • {selectedProofShare.advertisement?.title}</p>
+              </div>
+              <button
+                onClick={() => setSelectedProofShare(null)}
+                className="rounded-xl border border-slate-700 px-4 py-2 text-sm font-medium text-slate-300 hover:bg-slate-800"
+              >
+                Close
+              </button>
+            </div>
+
+            <div className="max-h-[80vh] overflow-auto bg-black/40 p-4">
+              {isDisplayableUrl(selectedProofShare.proofImage) ? (
+                isVideoUrl(selectedProofShare.proofImage) ? (
+                  <video
+                    src={selectedProofShare.proofImage}
+                    controls
+                    autoPlay
+                    className="mx-auto max-h-[72vh] w-auto max-w-full rounded-2xl"
+                  />
+                ) : (
+                  <img
+                    src={selectedProofShare.proofImage}
+                    alt="Submitted proof"
+                    className="mx-auto max-h-[72vh] w-auto max-w-full rounded-2xl"
+                  />
+                )
+              ) : (
+                <div className="flex min-h-[320px] items-center justify-center text-slate-400">
+                  Proof preview is not available.
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       )}
 
