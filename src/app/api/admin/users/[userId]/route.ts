@@ -64,13 +64,13 @@ async function getReferralInfo(userId: string) {
   try {
     // Get direct referrals (users who were referred by this user)
     const directReferrals = await User.find({ referredBy: userId })
-      .select('name referralCode isActive createdAt')
+      .select('name referralCode activationKey isActive createdAt')
       .sort({ createdAt: -1 })
       .lean();
 
     // Calculate stats
     const totalReferrals = directReferrals.length;
-    const activeReferrals = directReferrals.filter(ref => ref.isActive).length;
+    const activeReferrals = directReferrals.filter(ref => ref.isActive && ref.activationKey).length;
     const pendingReferrals = totalReferrals - activeReferrals;
 
     // Get the user's current data for commission info
@@ -98,7 +98,8 @@ async function getReferralInfo(userId: string) {
         name: ref.name,
         referralCode: ref.referralCode,
         joinedAt: ref.createdAt.toISOString(),
-        isActive: ref.isActive,
+        isActive: ref.isActive && Boolean(ref.activationKey),
+        hasActivationKey: Boolean(ref.activationKey),
       })),
       commissionBreakdown,
       stats: {

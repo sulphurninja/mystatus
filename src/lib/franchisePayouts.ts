@@ -62,8 +62,6 @@ async function createFranchisePayoutEntry({
     return false;
   }
 
-  const balanceBefore = recipient.walletBalance;
-
   const commission = await Commission.create([{
     user: recipient._id,
     referredUser: referredUserId,
@@ -73,12 +71,23 @@ async function createFranchisePayoutEntry({
     description
   }], { session });
 
-  await User.findByIdAndUpdate(recipient._id, {
-    $inc: {
-      walletBalance: amount,
-      totalCommissionEarned: amount
-    }
-  }, { session });
+  const updatedRecipient = await User.findByIdAndUpdate(
+    recipient._id,
+    {
+      $inc: {
+        walletBalance: amount,
+        totalCommissionEarned: amount
+      }
+    },
+    { new: true, session }
+  );
+
+  if (!updatedRecipient) {
+    throw new Error('Unable to credit franchise payout recipient');
+  }
+
+  const balanceAfter = updatedRecipient.walletBalance;
+  const balanceBefore = balanceAfter - amount;
 
   const transaction = await Transaction.create([{
     user: recipient._id,
@@ -87,7 +96,7 @@ async function createFranchisePayoutEntry({
     reason: 'franchise_daily',
     description,
     balanceBefore,
-    balanceAfter: balanceBefore + amount
+    balanceAfter
   }], { session });
 
   await FranchiseDailyPayout.create([{

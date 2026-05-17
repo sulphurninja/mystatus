@@ -71,8 +71,7 @@ export async function POST(request: NextRequest) {
       if (referrer) {
         await User.findByIdAndUpdate(referrer._id, {
           $inc: {
-            totalReferrals: 1,
-            activeReferrals: 1
+            totalReferrals: 1
           }
         }, { session: dbSession });
       }

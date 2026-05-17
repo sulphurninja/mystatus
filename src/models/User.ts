@@ -109,6 +109,8 @@ const UserSchema: Schema = new Schema({
   timestamps: true
 });
 
+UserSchema.index({ referredBy: 1, isActive: 1, activationKey: 1 });
+
 // Hash password before saving (if we add password field later)
 // UserSchema.pre('save', async function(next) {
 //   if (!this.isModified('password')) {

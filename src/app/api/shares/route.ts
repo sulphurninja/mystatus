@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import connectToDatabase from '@/lib/mongodb';
 import Share from '@/models/Share';
 import Advertisement from '@/models/Advertisement';
+import User from '@/models/User';
 import { authenticateRequest } from '@/middleware/auth';
 
 export async function POST(request: NextRequest) {
@@ -118,29 +119,20 @@ export async function POST(request: NextRequest) {
       createdAt: { $gte: today }
     });
 
-    // Determine share limit based on referral status
-    // Base limit
+    // Base allowance is 10 shares. Each directly referred user with an
+    // activation key adds 10 more shares.
     let dailyLimit = 10;
 
-    // Check if user has any referrals who purchased a key (active referrals)
-    // We check this by looking for 'key_activation' commissions earned by this user
     try {
-      // Need to import Commission model
-      const Commission = (await import('@/models/Commission')).default;
-      const hasKeyCommissions = await Commission.exists({
-        user: auth.user!.id,
-        commissionType: 'key_activation'
+      const activeKeyReferrals = await User.countDocuments({
+        referredBy: auth.user!.id,
+        isActive: true,
+        activationKey: { $exists: true, $nin: [null, ''] }
       });
 
-      // If user has earned key commissions, they get the boosted limit
-      if (hasKeyCommissions) {
-        // Limit scales with referral level: (Level + 1) * 10
-        // Level 1 -> 20, Level 2 -> 30, etc.
-        const userLevel = auth.user!.referralLevel || 1;
-        dailyLimit = (userLevel + 1) * 10;
-      }
+      dailyLimit += activeKeyReferrals * 10;
     } catch (err) {
-      console.error('Error checking commission status for share limit:', err);
+      console.error('Error checking active referral key count for share limit:', err);
       // Fallback to base limit on error
     }
 
@@ -148,7 +140,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           success: false,
-          message: `You have reached your daily share limit of ${dailyLimit}. ${dailyLimit === 10 ? 'Refer friends who purchase keys to increase your limit!' : 'Level up to increase your limit further!'}`
+          message: `You have reached your daily share limit of ${dailyLimit}. ${dailyLimit === 10 ? 'Refer friends who activate keys to increase your limit!' : 'Each activated direct referral adds 10 more shares.'}`
         },
         { status: 400 }
       );
