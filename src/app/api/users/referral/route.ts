@@ -32,14 +32,15 @@ export async function GET(request: NextRequest) {
 
     // Get direct referrals
     const directReferrals = await User.find({ referredBy: user._id })
-      .select('name referralCode createdAt isActive')
+      .select('name referralCode activationKey createdAt isActive')
       .sort({ createdAt: -1 });
 
     // Get referral statistics
     const totalReferrals = await User.countDocuments({ referredBy: user._id });
     const activeReferrals = await User.countDocuments({
       referredBy: user._id,
-      isActive: true
+      isActive: true,
+      activationKey: { $exists: true, $nin: [null, ''] }
     });
 
     // Get commission rates for all levels
@@ -69,8 +70,8 @@ export async function GET(request: NextRequest) {
       success: true,
       data: {
         referralCode: user.referralCode,
-        totalReferrals: user.totalReferrals,
-        activeReferrals: user.activeReferrals,
+        totalReferrals,
+        activeReferrals,
         referralLevel: user.referralLevel,
         totalCommissionEarned: user.totalCommissionEarned,
         referredBy: user.referredBy ? {
@@ -82,7 +83,8 @@ export async function GET(request: NextRequest) {
           name: ref.name,
           referralCode: ref.referralCode,
           joinedAt: ref.createdAt,
-          isActive: ref.isActive
+          isActive: ref.isActive && Boolean(ref.activationKey),
+          hasActivationKey: Boolean(ref.activationKey)
         })),
         stats: {
           totalReferrals,
@@ -159,8 +161,7 @@ export async function POST(request: NextRequest) {
       // Update referrer's stats
       await User.findByIdAndUpdate(referrer._id, {
         $inc: {
-          totalReferrals: 1,
-          activeReferrals: 1
+          totalReferrals: 1
         }
       }, { session });
 
