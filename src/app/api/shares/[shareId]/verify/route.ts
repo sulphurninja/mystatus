@@ -64,6 +64,14 @@ export async function PUT(
       );
     }
 
+    // Check if proof has already been submitted for this share
+    if (share.proofImage) {
+      return NextResponse.json(
+        { success: false, message: 'You have already submitted proof for this share. Please wait for it to be verified.' },
+        { status: 400 }
+      );
+    }
+
     const now = new Date();
 
     // Update share with proof image (Keep status as pending for admin review)

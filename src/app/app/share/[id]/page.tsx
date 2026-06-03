@@ -108,6 +108,11 @@ export default function ShareAdPage({ params }: { params: Promise<{ id: string }
       if (shareResult.success && shareResult.data) {
         // API returns existing pending share or newly created share
         setShare(shareResult.data);
+        
+        // Show informative toast if continuing an existing share
+        if (shareResult.message && shareResult.message.includes('Continuing')) {
+          toast({ title: 'Notice', description: shareResult.message });
+        }
       } else {
         // Show user-friendly error and redirect back
         const errorMessage = shareResult.message || 'Failed to create share';
