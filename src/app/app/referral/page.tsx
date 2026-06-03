@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useToast } from '@/hooks/use-toast';
 import AppHeader from '@/components/app/AppHeader';
 import CoinAmount from '@/components/app/CoinAmount';
 import {
@@ -52,6 +53,7 @@ interface ReferralData {
 
 export default function ReferralPage() {
   const { user, token } = useAuth();
+  const { toast } = useToast();
   const [referralData, setReferralData] = useState<ReferralData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [copied, setCopied] = useState(false);
@@ -93,7 +95,11 @@ export default function ReferralPage() {
       navigator.share({ title: 'Join MyStatus', text });
     } else {
       navigator.clipboard.writeText(text);
-      alert('Referral message copied to clipboard!');
+      toast({
+        title: 'Success',
+        description: 'Referral message copied to clipboard!',
+        variant: 'success'
+      });
     }
   };
 

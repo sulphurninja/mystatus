@@ -3,6 +3,7 @@
 import { useState, useEffect, use } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
+import { useToast } from '@/hooks/use-toast';
 import AppHeader from '@/components/app/AppHeader';
 import CoinAmount from '@/components/app/CoinAmount';
 import {
@@ -40,6 +41,7 @@ export default function ShareAdPage({ params }: { params: Promise<{ id: string }
   const resolvedParams = use(params);
   const { token, user } = useAuth();
   const router = useRouter();
+  const { toast } = useToast();
   const [ad, setAd] = useState<Ad | null>(null);
   const [share, setShare] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -86,7 +88,7 @@ export default function ShareAdPage({ params }: { params: Promise<{ id: string }
         });
       } else {
         // Ad not found
-        alert(adResult.message || 'Advertisement not found');
+        toast({ title: 'Error', description: adResult.message || 'Advertisement not found', variant: 'destructive' });
         router.push('/app/discover');
         return;
       }
@@ -109,7 +111,7 @@ export default function ShareAdPage({ params }: { params: Promise<{ id: string }
       } else {
         // Show user-friendly error and redirect back
         const errorMessage = shareResult.message || 'Failed to create share';
-        alert(errorMessage);
+        toast({ title: 'Wait!', description: errorMessage, variant: 'destructive' });
         
         // If ad not found, redirect to discover page instead of going back
         if (errorMessage.includes('not found') || errorMessage.includes('removed')) {
@@ -120,7 +122,7 @@ export default function ShareAdPage({ params }: { params: Promise<{ id: string }
       }
     } catch (error) {
       console.error('Error:', error);
-      alert('Failed to load ad details. Please try again.');
+      toast({ title: 'Error', description: 'Failed to load ad details. Please try again.', variant: 'destructive' });
       router.push('/app/discover');
     } finally {
       setIsLoading(false);
@@ -133,7 +135,7 @@ export default function ShareAdPage({ params }: { params: Promise<{ id: string }
 
     // Check file size (max 50MB)
     if (file.size > 50 * 1024 * 1024) {
-      alert('File size must be less than 50MB');
+      toast({ title: 'File Too Large', description: 'File size must be less than 50MB', variant: 'destructive' });
       return;
     }
 
@@ -201,7 +203,7 @@ export default function ShareAdPage({ params }: { params: Promise<{ id: string }
   const handleShareToWhatsApp = async () => {
     try {
       if (!shareUrl || !ad?._id) {
-        alert('Share link is not ready yet. Please try again.');
+        toast({ title: 'Error', description: 'Share link is not ready yet. Please try again.', variant: 'destructive' });
         return;
       }
       const baseUrl = window.location.origin;
@@ -217,7 +219,7 @@ export default function ShareAdPage({ params }: { params: Promise<{ id: string }
       window.open(whatsappUrl, '_blank', 'noopener,noreferrer');
     } catch (error) {
       console.error('Share error:', error);
-      alert('Could not open WhatsApp. Please try again.');
+      toast({ title: 'Error', description: 'Could not open WhatsApp. Please try again.', variant: 'destructive' });
     }
   };
 
@@ -245,12 +247,12 @@ export default function ShareAdPage({ params }: { params: Promise<{ id: string }
 
   const handleSubmit = async () => {
     if (!selectedFile) {
-      alert('Please select a proof image or video');
+      toast({ title: 'Missing Proof', description: 'Please select a proof image or video', variant: 'destructive' });
       return;
     }
 
     if (!share?.id) {
-      alert('Share record not found');
+      toast({ title: 'Error', description: 'Share record not found', variant: 'destructive' });
       return;
     }
 
@@ -279,14 +281,18 @@ export default function ShareAdPage({ params }: { params: Promise<{ id: string }
       setUploadProgress(1);
 
       if (verifyResult.success) {
-        alert('Verification proof submitted successfully! 🎉\n\nYour proof has been uploaded and submitted for review.');
+        toast({ 
+          title: 'Success!', 
+          description: 'Verification proof submitted successfully! 🎉 Your proof has been uploaded and submitted for review.', 
+          variant: 'success' 
+        });
         router.push('/app/my-shares');
       } else {
-        alert(verifyResult.message || 'Failed to submit verification');
+        toast({ title: 'Error', description: verifyResult.message || 'Failed to submit verification', variant: 'destructive' });
       }
     } catch (error: any) {
       console.error('Submit error:', error);
-      alert(error.message || 'Failed to upload proof. Please try again.');
+      toast({ title: 'Upload Failed', description: error.message || 'Failed to upload proof. Please try again.', variant: 'destructive' });
     } finally {
       setIsSubmitting(false);
       setUploadProgress(0);

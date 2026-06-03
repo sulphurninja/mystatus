@@ -1,17 +1,14 @@
+import { useToastContext } from '@/contexts/ToastContext';
+
 export function useToast() {
+  const { toast: contextToast } = useToastContext();
+
   const toast = ({ title, description, variant }: {
     title: string;
     description?: string;
-    variant?: 'default' | 'destructive';
+    variant?: 'default' | 'destructive' | 'success';
   }) => {
-    const message = description ? `${title}: ${description}` : title;
-    if (typeof window !== 'undefined') {
-      if (variant === 'destructive') {
-        window.alert(`Error: ${message}`);
-      } else {
-        window.alert(`Success: ${message}`);
-      }
-    }
+    contextToast({ title, description, variant });
   };
 
   return { toast };

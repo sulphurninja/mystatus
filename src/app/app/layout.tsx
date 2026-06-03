@@ -1,6 +1,7 @@
 'use client';
 
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
+import { ToastProvider } from '@/contexts/ToastContext';
 import BottomNav from '@/components/app/BottomNav';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect } from 'react';
@@ -61,7 +62,9 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <AuthProvider>
-      <AppLayoutContent>{children}</AppLayoutContent>
+      <ToastProvider>
+        <AppLayoutContent>{children}</AppLayoutContent>
+      </ToastProvider>
     </AuthProvider>
   );
 }

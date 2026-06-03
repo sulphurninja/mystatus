@@ -3,11 +3,13 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
+import { useToast } from '@/hooks/use-toast';
 import AppHeader from '@/components/app/AppHeader';
 import { ShoppingBag, Key, Crown, CheckCircle2, Loader2, Store, Search, Plus, Users, Sparkles } from 'lucide-react';
 
 export default function MarketplacePage() {
   const { token, refreshUserProfile } = useAuth();
+  const { toast } = useToast();
   const router = useRouter();
   const [keyTiers, setKeyTiers] = useState<any[]>([]);
   const [vendorPackages, setVendorPackages] = useState<any[]>([]);
@@ -197,10 +199,18 @@ export default function MarketplacePage() {
       setSelectedTier(null);
       // Refresh tiers to update available count
       await fetchKeyTiers();
-      alert('Key purchased successfully!');
+      toast({
+        title: 'Success',
+        description: 'Key purchased successfully!',
+        variant: 'success'
+      });
       router.push('/app/profile');
     } catch (error: any) {
-      alert(error.message || 'Failed to purchase key');
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to purchase key',
+        variant: 'destructive'
+      });
     } finally {
       setPurchasingKey(null);
     }
@@ -232,10 +242,18 @@ export default function MarketplacePage() {
       await refreshUserProfile();
       setSelectedFranchiseTier(null);
       await fetchFranchiseKeys();
-      alert('Franchise key purchased and activated!');
+      toast({
+        title: 'Success',
+        description: 'Franchise key purchased and activated!',
+        variant: 'success'
+      });
       router.push('/app/profile');
     } catch (error: any) {
-      alert(error.message || 'Failed to purchase franchise key');
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to purchase franchise key',
+        variant: 'destructive'
+      });
     } finally {
       setPurchasingFranchise(null);
     }
@@ -265,11 +283,19 @@ export default function MarketplacePage() {
   const handleVendorPackagePurchase = async () => {
     if (!selectedVendorPackage) return;
     if (!createMode && !selectedVendorId) {
-      alert('Select a vendor or add a new one');
+      toast({
+        title: 'Requirement',
+        description: 'Select a vendor or add a new one',
+        variant: 'destructive'
+      });
       return;
     }
     if (createMode && (!vendorForm.name || !vendorForm.email || !vendorForm.businessName)) {
-      alert('Fill required fields for new vendor');
+      toast({
+        title: 'Requirement',
+        description: 'Fill required fields for new vendor',
+        variant: 'destructive'
+      });
       return;
     }
 
@@ -297,7 +323,11 @@ export default function MarketplacePage() {
       }
 
       await refreshUserProfile();
-      alert('Vendor package recorded. Pending admin approval.');
+      toast({
+        title: 'Success',
+        description: 'Vendor package recorded. Pending admin approval.',
+        variant: 'success'
+      });
       setSelectedVendorPackage(null);
       setSelectedVendorId(null);
       setVendorForm({ name: '', email: '', businessName: '', phone: '' });
@@ -305,7 +335,11 @@ export default function MarketplacePage() {
       setVendorSearch('');
       router.push('/app/profile');
     } catch (e: any) {
-      alert(e.message || 'Failed to purchase vendor package');
+      toast({
+        title: 'Error',
+        description: e.message || 'Failed to purchase vendor package',
+        variant: 'destructive'
+      });
     } finally {
       setPurchasingVendorPkg(false);
     }
