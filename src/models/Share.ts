@@ -77,15 +77,4 @@ const ShareSchema: Schema = new Schema({
 ShareSchema.index({ user: 1, advertisement: 1 });
 ShareSchema.index({ status: 1, verificationDeadline: 1 });
 
-// Compound unique index to prevent duplicate pending shares
-// Only one pending share per user per advertisement
-ShareSchema.index(
-  { user: 1, advertisement: 1, status: 1 },
-  { 
-    unique: true,
-    partialFilterExpression: { status: 'pending' },
-    name: 'unique_pending_share'
-  }
-);
-
 export default mongoose.models.Share || mongoose.model<IShare>('Share', ShareSchema);

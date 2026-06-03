@@ -51,46 +51,63 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check if user already has a pending share for this advertisement
-    // (unique index also enforces this, but we return a friendly response)
-    const existingShare = await Share.findOne({
+    const cooldownMs = 24 * 60 * 60 * 1000;
+    const now = new Date();
+
+    // Check if user already has a RECENT pending share for this advertisement (within 24h)
+    const recentPendingShare = await Share.findOne({
       user: auth.user!.id,
       advertisement: advertisementId,
-      status: 'pending'
+      status: 'pending',
+      createdAt: { $gt: new Date(now.getTime() - cooldownMs) }
     }).populate('advertisement', 'title');
 
-    if (existingShare) {
-      // Return the existing pending share instead of creating a duplicate
+    if (recentPendingShare) {
+      const lastShareAt = recentPendingShare.createdAt;
+      const nextAllowedAt = new Date(lastShareAt.getTime() + cooldownMs);
+      const msRemaining = nextAllowedAt.getTime() - now.getTime();
+      const hours = Math.floor(msRemaining / (60 * 60 * 1000));
+      const minutes = Math.ceil((msRemaining % (60 * 60 * 1000)) / (60 * 1000));
+      const remainingText = hours <= 0 ? `${minutes}m` : `${hours}h ${minutes}m`;
+
+      // If proof is already submitted for this recent attempt, block it
+      if (recentPendingShare.proofImage) {
+        return NextResponse.json(
+          {
+            success: false,
+            message: `You already have a recent share for this advertisement that is under review. Please wait for verification or wait ${remainingText} to share again.`
+          },
+          { status: 400 }
+        );
+      }
+
+      // If proof is NOT submitted for this recent attempt, allow them to continue it
       return NextResponse.json({
         success: true,
-        message: 'You already have a pending share for this advertisement',
+        message: `Continuing your pending share for this advertisement. Please upload proof to finish. You can start a fresh share in ${remainingText}.`,
         data: {
-          id: existingShare._id,
-          advertisement: existingShare.advertisement ? {
-            id: existingShare.advertisement._id,
-            title: existingShare.advertisement.title
+          id: recentPendingShare._id,
+          advertisement: recentPendingShare.advertisement ? {
+            id: recentPendingShare.advertisement._id,
+            title: recentPendingShare.advertisement.title
           } : null,
-          sharedAt: existingShare.sharedAt || existingShare.createdAt,
-          verificationDeadline: existingShare.verificationDeadline,
-          status: existingShare.status,
-          rewardAmount: existingShare.rewardAmount,
-          proofImage: existingShare.proofImage || null
+          sharedAt: recentPendingShare.sharedAt || recentPendingShare.createdAt,
+          verificationDeadline: recentPendingShare.verificationDeadline,
+          status: recentPendingShare.status,
+          rewardAmount: recentPendingShare.rewardAmount,
+          proofImage: recentPendingShare.proofImage || null
         }
       });
     }
 
-    // Allow re-sharing an ad after a 24-hour cooldown from the last share attempt
-    // (regardless of status). Pending shares are handled above.
-    const cooldownMs = 24 * 60 * 60 * 1000;
-    const now = new Date();
-
+    // Check cooldown for ANY last share attempt (Verified, Rejected, or older Pending)
     const lastShare = await Share.findOne({
       user: auth.user!.id,
       advertisement: advertisementId
-    }).sort({ sharedAt: -1, createdAt: -1 });
+    }).sort({ createdAt: -1 });
 
     if (lastShare) {
-      const lastShareAt = lastShare.sharedAt || lastShare.createdAt;
+      const lastShareAt = lastShare.createdAt;
       const nextAllowedAt = new Date(lastShareAt.getTime() + cooldownMs);
       if (now < nextAllowedAt) {
         const msRemaining = nextAllowedAt.getTime() - now.getTime();
@@ -146,52 +163,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // We still prevent multiple simultaneous pending shares for the same ad,
-    // and enforce a 24-hour cooldown after the last share attempt.
-
-    // Create share record with duplicate protection
+    // Create share record
     const verificationDeadline = new Date();
     verificationDeadline.setHours(verificationDeadline.getHours() + advertisement.verificationPeriodHours);
 
-    let share;
-    try {
-      share = await Share.create({
-        user: auth.user!.id,
-        advertisement: advertisementId,
-        verificationDeadline,
-        rewardAmount: advertisement.rewardAmount,
-        status: 'pending'
-      });
-    } catch (error: any) {
-      // Handle duplicate key error (race condition)
-      if (error.code === 11000) {
-        const existingShare = await Share.findOne({
-          user: auth.user!.id,
-          advertisement: advertisementId,
-          status: 'pending'
-        }).populate('advertisement', 'title');
-
-        if (existingShare) {
-          return NextResponse.json({
-            success: true,
-            message: 'You already have a pending share for this advertisement',
-            data: {
-              id: existingShare._id,
-              advertisement: existingShare.advertisement ? {
-                id: existingShare.advertisement._id,
-                title: existingShare.advertisement.title
-              } : null,
-              sharedAt: existingShare.sharedAt || existingShare.createdAt,
-              verificationDeadline: existingShare.verificationDeadline,
-              status: existingShare.status,
-              rewardAmount: existingShare.rewardAmount,
-              proofImage: existingShare.proofImage || null
-            }
-          });
-        }
-      }
-      throw error;
-    }
+    const share = await Share.create({
+      user: auth.user!.id,
+      advertisement: advertisementId,
+      verificationDeadline,
+      rewardAmount: advertisement.rewardAmount,
+      status: 'pending'
+    });
 
     // Update advertisement share count
     await Advertisement.findByIdAndUpdate(advertisementId, {
