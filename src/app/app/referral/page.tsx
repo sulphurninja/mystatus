@@ -11,13 +11,11 @@ import {
   Share2,
   TrendingUp,
   Award,
-  ChevronDown,
   CheckCircle2,
   GitBranch,
   Wallet,
   Key,
   UserCheck,
-  UserX,
   Info,
 } from 'lucide-react';
 import Link from 'next/link';
@@ -47,6 +45,8 @@ interface ReferralData {
     levelBonus: number;
     keyPurchaseBonus: number;
     totalEarned: number;
+    paidEarned: number;
+    pendingEarned: number;
     totalCommissions: number;
   }>;
 }
@@ -266,6 +266,8 @@ export default function ReferralPage() {
           <div className="glass-card rounded-2xl overflow-hidden">
             {commissionBreakdown.map((level, index) => {
               const isActive = level.level <= (referralData?.referralLevel || 1);
+              const paidEarned = level.paidEarned ?? level.totalEarned;
+              const pendingEarned = level.pendingEarned ?? 0;
               return (
                 <div 
                   key={level.level}
@@ -290,6 +292,14 @@ export default function ReferralPage() {
                       <div>
                         <CoinAmount amount={level.totalEarned} size="sm" />
                         <p className="text-[10px] text-slate-500">Earned</p>
+                      </div>
+                      <div>
+                        <CoinAmount amount={paidEarned} size="sm" />
+                        <p className="text-[10px] text-emerald-500">Paid</p>
+                      </div>
+                      <div>
+                        <CoinAmount amount={pendingEarned} size="sm" />
+                        <p className="text-[10px] text-amber-500">Locked</p>
                       </div>
                       <div>
                         <p className="text-sm font-medium text-white">{level.totalCommissions}</p>

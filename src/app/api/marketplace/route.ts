@@ -4,10 +4,10 @@ import connectToDatabase from '@/lib/mongodb';
 import ActivationKey from '@/models/ActivationKey';
 import User from '@/models/User';
 import Transaction from '@/models/Transaction';
-import Commission from '@/models/Commission';
 import KeyTier from '@/models/KeyTier';
 import { authenticateRequest } from '@/middleware/auth';
 import { awardStarsForFirstActivation } from '@/lib/starRating';
+import { createQualifiedCommission } from '@/lib/commissionQualification';
 
 // Get user's purchased keys
 export async function PATCH(request: NextRequest) {
@@ -264,7 +264,12 @@ export async function POST(request: NextRequest) {
 }
 
 // Process MLM commissions using Key Tiers
-async function processMLMCommissions(buyerId: string, referrerId: string, keyPrice: number, session: any) {
+async function processMLMCommissions(
+  buyerId: string,
+  referrerId: string,
+  keyPrice: number,
+  session: mongoose.ClientSession
+) {
   try {
     // Find the tier for this key price
     const tier = await KeyTier.findOne({
@@ -303,42 +308,17 @@ async function processMLMCommissions(buyerId: string, referrerId: string, keyPri
       const commissionAmount = tier.commissions[levelKey] || 0;
 
       if (commissionAmount > 0) {
-      // Get current balance before updating
-      const currentUser = await User.findById(chainItem.userId).session(session);
-        if (!currentUser) continue;
-        
-        const balanceBefore = currentUser.walletBalance;
-
-      // Create commission record
-      await Commission.create([{
-        user: chainItem.userId,
-        referredUser: buyerId,
-        commissionType: 'key_purchase',
-        level: chainItem.level,
-        amount: commissionAmount,
+        const result = await createQualifiedCommission({
+          session,
+          userId: chainItem.userId,
+          referredUserId: buyerId,
+          commissionType: 'key_purchase',
+          level: chainItem.level,
+          amount: commissionAmount,
           description: `Level ${chainItem.level} commission from key purchase (${tier.name} tier)`
-      }], { session });
+        });
 
-      // Credit to user's wallet
-      await User.findByIdAndUpdate(chainItem.userId, {
-        $inc: {
-          walletBalance: commissionAmount,
-          totalCommissionEarned: commissionAmount
-        }
-      }, { session });
-
-      // Create transaction record with correct balance values
-      await Transaction.create([{
-        user: chainItem.userId,
-        type: 'credit',
-        amount: commissionAmount,
-        reason: 'referral_bonus',
-          description: `Level ${chainItem.level} referral bonus from key purchase (${tier.name})`,
-        balanceBefore: balanceBefore,
-        balanceAfter: balanceBefore + commissionAmount
-      }], { session });
-
-        console.log(`Paid ₹${commissionAmount} to level ${chainItem.level} referrer`);
+        console.log(`${result.paid ? 'Paid' : 'Locked'} ₹${commissionAmount} level ${chainItem.level} key purchase commission`);
       }
     }
   } catch (error) {

@@ -3,6 +3,7 @@ import connectToDatabase from '@/lib/mongodb';
 import User from '@/models/User';
 import { generateToken } from '@/middleware/auth';
 import mongoose from 'mongoose';
+import { releaseQualifiedPendingCommissions } from '@/lib/commissionQualification';
 
 export async function POST(request: NextRequest) {
   try {
@@ -74,6 +75,8 @@ export async function POST(request: NextRequest) {
             totalReferrals: 1
           }
         }, { session: dbSession });
+
+        await releaseQualifiedPendingCommissions(referrer._id, dbSession);
       }
 
       // Commit transaction

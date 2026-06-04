@@ -15,6 +15,7 @@ export interface ICommission extends Document {
   level: number; // 1-30 for MLM levels
   amount: number;
   description: string;
+  payoutStatus: 'pending' | 'paid';
   isPaid: boolean;
   paidAt?: Date;
   createdAt: Date;
@@ -51,6 +52,12 @@ const CommissionSchema: Schema = new Schema({
     type: String,
     required: true
   },
+  payoutStatus: {
+    type: String,
+    enum: ['pending', 'paid'],
+    default: 'paid',
+    index: true
+  },
   isPaid: {
     type: Boolean,
     default: false
@@ -66,5 +73,6 @@ const CommissionSchema: Schema = new Schema({
 CommissionSchema.index({ user: 1, createdAt: -1 });
 CommissionSchema.index({ referredUser: 1 });
 CommissionSchema.index({ commissionType: 1, level: 1 });
+CommissionSchema.index({ user: 1, payoutStatus: 1, level: 1 });
 
 export default mongoose.models.Commission || mongoose.model<ICommission>('Commission', CommissionSchema);

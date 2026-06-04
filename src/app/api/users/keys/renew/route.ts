@@ -4,9 +4,9 @@ import connectToDatabase from '@/lib/mongodb';
 import User from '@/models/User';
 import ActivationKey from '@/models/ActivationKey';
 import Transaction from '@/models/Transaction';
-import Commission from '@/models/Commission';
 import KeyTier from '@/models/KeyTier';
 import { verifyToken, getTokenFromRequest } from '@/middleware/auth';
+import { createQualifiedCommission } from '@/lib/commissionQualification';
 
 // POST - Renew user's activation key
 export async function POST(request: NextRequest) {
@@ -187,7 +187,12 @@ export async function POST(request: NextRequest) {
 }
 
 // Process MLM commissions for key renewal using Key Tiers
-async function processRenewalCommissions(userId: string, referrerId: string, keyPrice: number, session: any) {
+async function processRenewalCommissions(
+  userId: string,
+  referrerId: string,
+  keyPrice: number,
+  session: mongoose.ClientSession
+) {
   try {
     // Find the tier for this key price
     const tier = await KeyTier.findOne({
@@ -226,42 +231,17 @@ async function processRenewalCommissions(userId: string, referrerId: string, key
       const commissionAmount = tier.commissions[levelKey] || 0;
 
       if (commissionAmount > 0) {
-        // Get current balance before updating
-        const currentUser = await User.findById(chainItem.userId).session(session);
-        if (!currentUser) continue;
-        
-        const balanceBefore = currentUser.walletBalance;
-
-        // Create commission record
-        await Commission.create([{
-          user: chainItem.userId,
-          referredUser: userId,
+        const result = await createQualifiedCommission({
+          session,
+          userId: chainItem.userId,
+          referredUserId: userId,
           commissionType: 'key_renewal',
           level: chainItem.level,
           amount: commissionAmount,
           description: `Level ${chainItem.level} commission from key renewal (${tier.name} tier)`
-        }], { session });
+        });
 
-        // Credit to user's wallet
-        await User.findByIdAndUpdate(chainItem.userId, {
-          $inc: {
-            walletBalance: commissionAmount,
-            totalCommissionEarned: commissionAmount
-          }
-        }, { session });
-
-        // Create transaction record
-        await Transaction.create([{
-          user: chainItem.userId,
-          type: 'credit',
-          amount: commissionAmount,
-          reason: 'referral_bonus',
-          description: `Level ${chainItem.level} referral bonus from key renewal (${tier.name})`,
-          balanceBefore: balanceBefore,
-          balanceAfter: balanceBefore + commissionAmount
-        }], { session });
-
-        console.log(`Paid ₹${commissionAmount} to level ${chainItem.level} referrer`);
+        console.log(`${result.paid ? 'Paid' : 'Locked'} ₹${commissionAmount} level ${chainItem.level} key renewal commission`);
       }
     }
   } catch (error) {

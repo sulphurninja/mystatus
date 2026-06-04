@@ -1,10 +1,9 @@
 import mongoose from 'mongoose';
 import User from '@/models/User';
-import Commission from '@/models/Commission';
-import Transaction from '@/models/Transaction';
 import FranchisePayoutPlan from '@/models/FranchisePayoutPlan';
 import FranchisePayoutRun from '@/models/FranchisePayoutRun';
 import FranchiseDailyPayout from '@/models/FranchiseDailyPayout';
+import { createQualifiedCommission } from '@/lib/commissionQualification';
 
 export type FranchisePayoutRunSummary = {
   payoutDate: Date;
@@ -62,42 +61,15 @@ async function createFranchisePayoutEntry({
     return false;
   }
 
-  const commission = await Commission.create([{
-    user: recipient._id,
-    referredUser: referredUserId,
+  const result = await createQualifiedCommission({
+    session,
+    userId: recipient._id,
+    referredUserId,
     commissionType: 'franchise_daily',
     level,
     amount,
     description
-  }], { session });
-
-  const updatedRecipient = await User.findByIdAndUpdate(
-    recipient._id,
-    {
-      $inc: {
-        walletBalance: amount,
-        totalCommissionEarned: amount
-      }
-    },
-    { new: true, session }
-  );
-
-  if (!updatedRecipient) {
-    throw new Error('Unable to credit franchise payout recipient');
-  }
-
-  const balanceAfter = updatedRecipient.walletBalance;
-  const balanceBefore = balanceAfter - amount;
-
-  const transaction = await Transaction.create([{
-    user: recipient._id,
-    type: 'credit',
-    amount,
-    reason: 'franchise_daily',
-    description,
-    balanceBefore,
-    balanceAfter
-  }], { session });
+  });
 
   await FranchiseDailyPayout.create([{
     plan: plan._id,
@@ -107,11 +79,10 @@ async function createFranchisePayoutEntry({
     level,
     amount,
     payoutDate,
-    commission: commission[0]?._id,
-    transaction: transaction[0]?._id
+    commission: result.commission?._id
   }], { session });
 
-  return true;
+  return { created: true, paid: result.paid };
 }
 
 export async function runDailyFranchisePayouts(input?: { date?: string | Date; limit?: number }) {
@@ -198,7 +169,7 @@ export async function runDailyFranchisePayouts(input?: { date?: string | Date; l
             description: 'Level 1 franchise daily payout for key purchaser'
           });
 
-          if (created) {
+          if (created && created.paid) {
             planPaid += amount;
             planRecipients += 1;
           }
@@ -225,7 +196,7 @@ export async function runDailyFranchisePayouts(input?: { date?: string | Date; l
           description: `Level ${level} franchise daily payout`
         });
 
-        if (created) {
+        if (created && created.paid) {
           planPaid += amount;
           planRecipients += 1;
         }

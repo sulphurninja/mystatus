@@ -4,8 +4,8 @@ import connectToDatabase from '@/lib/mongodb';
 import User from '@/models/User';
 import Commission from '@/models/Commission';
 import CommissionRate from '@/models/CommissionRate';
-import Transaction from '@/models/Transaction';
 import { authenticateRequest } from '@/middleware/auth';
+import { createQualifiedCommission, releaseQualifiedPendingCommissions } from '@/lib/commissionQualification';
 
 // Get user's referral information
 export async function GET(request: NextRequest) {
@@ -45,6 +45,7 @@ export async function GET(request: NextRequest) {
 
     // Get commission rates for all levels
     const commissionRates = await CommissionRate.find({ isActive: true }).sort({ level: 1 });
+    const qualifiedLevel = Math.min(totalReferrals, 6);
 
     // Get commission breakdown by level
     const commissionBreakdown = [];
@@ -62,6 +63,12 @@ export async function GET(request: NextRequest) {
         levelBonus: levelRate?.levelBonus || 0,
         keyPurchaseBonus: levelRate?.keyPurchaseBonus || 0,
         totalEarned: levelCommissions.reduce((sum, comm) => sum + comm.amount, 0),
+        paidEarned: levelCommissions
+          .filter(comm => comm.isPaid || comm.payoutStatus !== 'pending')
+          .reduce((sum, comm) => sum + comm.amount, 0),
+        pendingEarned: levelCommissions
+          .filter(comm => comm.payoutStatus === 'pending')
+          .reduce((sum, comm) => sum + comm.amount, 0),
         totalCommissions: levelCommissions.length
       });
     }
@@ -72,7 +79,7 @@ export async function GET(request: NextRequest) {
         referralCode: user.referralCode,
         totalReferrals,
         activeReferrals,
-        referralLevel: user.referralLevel,
+        referralLevel: qualifiedLevel,
         totalCommissionEarned: user.totalCommissionEarned,
         referredBy: user.referredBy ? {
           name: user.referredBy.name,
@@ -165,6 +172,8 @@ export async function POST(request: NextRequest) {
         }
       }, { session });
 
+      await releaseQualifiedPendingCommissions(referrer._id, session);
+
       // Process referral commission
       const commissionRates = await CommissionRate.find({ isActive: true, level: 1 });
       const rate = commissionRates[0];
@@ -172,35 +181,15 @@ export async function POST(request: NextRequest) {
       if (rate && rate.referralBonus > 0) {
         const commissionAmount = 500; // Fixed referral bonus for direct referral
 
-        // Create commission record
-        await Commission.create([{
-          user: referrer._id,
-          referredUser: auth.user!.id,
+        await createQualifiedCommission({
+          session,
+          userId: referrer._id,
+          referredUserId: auth.user!.id,
           commissionType: 'referral',
           level: 1,
           amount: commissionAmount,
           description: 'Direct referral bonus'
-        }], { session });
-
-        // Credit to referrer's wallet
-        await User.findByIdAndUpdate(referrer._id, {
-          $inc: {
-            walletBalance: commissionAmount,
-            totalCommissionEarned: commissionAmount
-          }
-        }, { session });
-
-        // Create transaction record
-        const referrerUser = await User.findById(referrer._id).session(session);
-        await Transaction.create([{
-          user: referrer._id,
-          type: 'credit',
-          amount: commissionAmount,
-          reason: 'referral_bonus',
-          description: 'Direct referral bonus',
-          balanceBefore: referrerUser!.walletBalance,
-          balanceAfter: referrerUser!.walletBalance + commissionAmount
-        }], { session });
+        });
       }
 
       await session.commitTransaction();

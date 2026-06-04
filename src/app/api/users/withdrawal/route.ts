@@ -3,13 +3,12 @@ import connectToDatabase from '@/lib/mongodb';
 import User from '@/models/User';
 import ActivationKey from '@/models/ActivationKey';
 import WithdrawalRequest from '@/models/WithdrawalRequest';
-import Transaction from '@/models/Transaction';
-import Commission from '@/models/Commission';
 import KeyTier from '@/models/KeyTier';
 import { verifyToken, getTokenFromRequest } from '@/middleware/auth';
 import mongoose from 'mongoose';
 import { calculateWithdrawalCharges } from '@/lib/withdrawalCharges';
 import { awardStarsForFirstActivation } from '@/lib/starRating';
+import { createQualifiedCommission } from '@/lib/commissionQualification';
 
 const MIN_WITHDRAWAL_AMOUNT = 2500;
 
@@ -264,6 +263,15 @@ export async function POST(request: NextRequest) {
 
       if (didActivateKey) {
         await awardStarsForFirstActivation(user._id, dbSession);
+
+        if (user.referredBy && userKey) {
+          await processKeyActivationCommissions(
+            user._id.toString(),
+            user.referredBy.toString(),
+            userKey.price,
+            dbSession
+          );
+        }
       }
 
       const keyToUse = userKey;
@@ -376,7 +384,12 @@ export async function POST(request: NextRequest) {
 }
 
 // Process MLM commissions when a key is activated (first time use)
-async function processKeyActivationCommissions(userId: string, referrerId: string, keyPrice: number, session: any) {
+async function processKeyActivationCommissions(
+  userId: string,
+  referrerId: string,
+  keyPrice: number,
+  session: mongoose.ClientSession
+) {
   try {
     // Find the tier for this key price
     const tier = await KeyTier.findOne({
@@ -415,42 +428,17 @@ async function processKeyActivationCommissions(userId: string, referrerId: strin
       const commissionAmount = tier.commissions[levelKey] || 0;
 
       if (commissionAmount > 0) {
-        // Get current balance before updating
-        const currentUser = await User.findById(chainItem.userId).session(session);
-        if (!currentUser) continue;
-
-        const balanceBefore = currentUser.walletBalance;
-
-        // Create commission record
-        await Commission.create([{
-          user: chainItem.userId,
-          referredUser: userId,
+        const result = await createQualifiedCommission({
+          session,
+          userId: chainItem.userId,
+          referredUserId: userId,
           commissionType: 'key_activation',
           level: chainItem.level,
           amount: commissionAmount,
           description: `Level ${chainItem.level} commission from key activation (${tier.name} tier)`
-        }], { session });
+        });
 
-        // Credit to user's wallet
-        await User.findByIdAndUpdate(chainItem.userId, {
-          $inc: {
-            walletBalance: commissionAmount,
-            totalCommissionEarned: commissionAmount
-          }
-        }, { session });
-
-        // Create transaction record
-        await Transaction.create([{
-          user: chainItem.userId,
-          type: 'credit',
-          amount: commissionAmount,
-          reason: 'referral_bonus',
-          description: `Level ${chainItem.level} referral bonus from key activation (${tier.name})`,
-          balanceBefore: balanceBefore,
-          balanceAfter: balanceBefore + commissionAmount
-        }], { session });
-
-        console.log(`Paid ₹${commissionAmount} to level ${chainItem.level} referrer for key activation`);
+        console.log(`${result.paid ? 'Paid' : 'Locked'} ₹${commissionAmount} level ${chainItem.level} key activation commission`);
       }
     }
   } catch (error) {

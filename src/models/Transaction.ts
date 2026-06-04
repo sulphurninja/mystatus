@@ -66,7 +66,7 @@ const TransactionSchema: Schema = new Schema({
   },
   referenceModel: {
     type: String,
-    enum: ['Share', 'Advertisement', 'User', 'Vendor']
+    enum: ['Share', 'Advertisement', 'User', 'Vendor', 'Commission']
   },
   balanceBefore: {
     type: Number,
