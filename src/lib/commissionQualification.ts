@@ -39,7 +39,14 @@ export async function createQualifiedCommission({
   }
 
   const qualifiedLevel = await getQualifiedCommissionLevel(userId, session);
-  const isQualified = level <= qualifiedLevel;
+  
+  // Logic for qualification:
+  // For franchise_daily: Level 1 is self (0 referrals needed), Level 2 is direct referral (1 referral needed), etc.
+  // For others: Level 1 is direct referral (1 referral needed), Level 2 is 2nd gen (2 referrals needed), etc.
+  const isQualified = commissionType === 'franchise_daily' 
+    ? level <= qualifiedLevel + 1 
+    : level <= qualifiedLevel;
+    
   const now = new Date();
 
   const commission = await Commission.create([{
@@ -93,16 +100,16 @@ export async function releaseQualifiedPendingCommissions(
   session: mongoose.ClientSession
 ) {
   const qualifiedLevel = await getQualifiedCommissionLevel(userId, session);
-  if (qualifiedLevel < 1) {
-    return { releasedCount: 0, releasedAmount: 0 };
-  }
 
   const pendingCommissions = await Commission.find({
     user: userId,
     isPaid: false,
     payoutStatus: 'pending',
-    level: { $lte: qualifiedLevel },
-    amount: { $gt: 0 }
+    amount: { $gt: 0 },
+    $or: [
+      { commissionType: 'franchise_daily', level: { $lte: qualifiedLevel + 1 } },
+      { commissionType: { $ne: 'franchise_daily' }, level: { $lte: qualifiedLevel } }
+    ]
   }).sort({ createdAt: 1 }).session(session);
 
   let releasedCount = 0;
