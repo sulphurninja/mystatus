@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Plus } from 'lucide-react';
+import { CheckCircle2, Loader2, Plus } from 'lucide-react';
 
 type FranchiseKeyItem = {
   _id: string;
@@ -30,6 +30,7 @@ export default function FranchiseKeysPage() {
   const [count, setCount] = useState(10);
   const [price, setPrice] = useState(10000);
   const [isForSale, setIsForSale] = useState(true);
+  const [showActiveOnly, setShowActiveOnly] = useState(false);
 
   useEffect(() => {
     checkAuth();
@@ -67,7 +68,7 @@ export default function FranchiseKeysPage() {
           variant: 'destructive'
         });
       }
-    } catch (error) {
+    } catch {
       toast({
         title: 'Error',
         description: 'Failed to load franchise keys',
@@ -104,7 +105,7 @@ export default function FranchiseKeysPage() {
           variant: 'destructive'
         });
       }
-    } catch (error) {
+    } catch {
       toast({
         title: 'Error',
         description: 'Failed to generate keys',
@@ -129,14 +130,19 @@ export default function FranchiseKeysPage() {
         throw new Error(data.message || 'Failed to toggle plan');
       }
       await loadKeys();
-    } catch (error: any) {
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to toggle payout plan';
       toast({
         title: 'Error',
-        description: error.message || 'Failed to toggle payout plan',
+        description: message,
         variant: 'destructive'
       });
     }
   };
+
+  const activeKeys = keys.filter((item) => item.isUsed);
+  const activeFranchiseKeys = activeKeys.length;
+  const displayedKeys = showActiveOnly ? activeKeys : keys;
 
   if (loading) {
     return (
@@ -160,6 +166,29 @@ export default function FranchiseKeysPage() {
         <p className="text-slate-400 text-lg font-medium">
           Generate and manage franchise keys for recurring payouts
         </p>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+        <button
+          type="button"
+          onClick={() => setShowActiveOnly(true)}
+          className={`bg-slate-900/60 border rounded-2xl p-6 text-left transition-all duration-300 hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/70 ${
+            showActiveOnly
+              ? 'border-emerald-500/60 shadow-lg shadow-emerald-500/10'
+              : 'border-slate-800 hover:border-emerald-500/40'
+          }`}
+        >
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <p className="text-sm font-medium text-slate-400">Active Franchise Keys</p>
+              <p className="mt-3 text-4xl font-bold text-slate-100">{activeFranchiseKeys}</p>
+            </div>
+            <div className="h-12 w-12 rounded-2xl bg-emerald-500/15 text-emerald-300 flex items-center justify-center">
+              <CheckCircle2 className="h-6 w-6" />
+            </div>
+          </div>
+          <p className="mt-4 text-xs text-slate-500">Click to view active key list</p>
+        </button>
       </div>
 
       <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-6 space-y-4">
@@ -212,12 +241,32 @@ export default function FranchiseKeysPage() {
       </div>
 
       <div className="bg-slate-900/60 border border-slate-800 rounded-2xl overflow-hidden">
-        <div className="px-6 py-4 border-b border-slate-800 text-slate-300 font-semibold">Recent Keys</div>
+        <div className="px-6 py-4 border-b border-slate-800 flex items-center justify-between gap-4">
+          <div>
+            <p className="text-slate-300 font-semibold">
+              {showActiveOnly ? 'Active Franchise Keys' : 'Recent Keys'}
+            </p>
+            {showActiveOnly && (
+              <p className="mt-1 text-xs text-slate-500">
+                Showing {activeFranchiseKeys} keys currently used by users
+              </p>
+            )}
+          </div>
+          {showActiveOnly && (
+            <button
+              type="button"
+              onClick={() => setShowActiveOnly(false)}
+              className="px-3 py-1.5 rounded-lg border border-slate-700 text-xs font-semibold text-slate-200 hover:bg-slate-800/70"
+            >
+              Show all
+            </button>
+          )}
+        </div>
         <div className="divide-y divide-slate-800">
-          {keys.length === 0 ? (
+          {displayedKeys.length === 0 ? (
             <div className="p-6 text-slate-500">No franchise keys found.</div>
           ) : (
-            keys.map((item) => (
+            displayedKeys.map((item) => (
               <div key={item._id} className="px-6 py-4 flex flex-col gap-1">
                 <div className="flex items-center justify-between">
                   <span className="text-slate-200 font-semibold">{item.key}</span>
