@@ -32,7 +32,20 @@ export default function AdminLoginPage() {
       if (data.success) {
         // Store token in localStorage
         localStorage.setItem('adminToken', data.data.token);
-        router.push('/admin/dashboard');
+        localStorage.setItem('adminUser', JSON.stringify(data.data.admin));
+
+        const permissions = data.data.admin.permissions || [];
+        if (data.data.admin.role === 'sub-admin') {
+          if (permissions.includes('vendors.create') || permissions.includes('vendors.approve')) {
+            router.push('/admin/vendors');
+          } else if (permissions.includes('advertisements.create') || permissions.includes('advertisements.approve')) {
+            router.push('/admin/advertisements');
+          } else {
+            router.push('/admin/login');
+          }
+        } else {
+          router.push('/admin/dashboard');
+        }
       } else {
         setError(data.message || 'Login failed');
       }

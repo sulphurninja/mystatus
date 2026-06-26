@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import connectToDatabase from '@/lib/mongodb';
 import Advertisement from '@/models/Advertisement';
-import { authenticateRequest } from '@/middleware/auth';
+import { authorizeAdminRequest } from '@/middleware/auth';
 
 export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ adId: string }> }
 ) {
   try {
-    const auth = authenticateRequest(request, ['admin']);
+    const auth = await authorizeAdminRequest(request, 'advertisements.approve');
     if (auth.error) {
       return NextResponse.json(
         { success: false, message: auth.error.message },

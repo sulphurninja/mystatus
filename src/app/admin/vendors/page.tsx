@@ -51,6 +51,28 @@ export default function VendorsPage() {
   const [passwordSaving, setPasswordSaving] = useState(false);
   const router = useRouter();
 
+  const getAdminUser = () => {
+    if (typeof window === 'undefined') return null;
+    try {
+      const raw = localStorage.getItem('adminUser');
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  };
+
+  const canCreateVendors = () => {
+    const admin = getAdminUser();
+    return admin?.role !== 'sub-admin' || admin?.permissions?.includes('vendors.create');
+  };
+
+  const canApproveVendors = () => {
+    const admin = getAdminUser();
+    return admin?.role !== 'sub-admin' || admin?.permissions?.includes('vendors.approve');
+  };
+
+  const isMainAdmin = () => getAdminUser()?.role !== 'sub-admin';
+
   useEffect(() => {
     checkAuth();
     loadVendors();
@@ -249,17 +271,19 @@ export default function VendorsPage() {
 
       {/* Add Vendor Button */}
       <div className="flex justify-end">
-        <button
-          onClick={() => setShowAddModal(true)}
-          className="group relative bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white px-6 py-3 rounded-2xl font-semibold shadow-lg shadow-emerald-500/25 hover:shadow-emerald-500/40 transition-all duration-300 hover:-translate-y-0.5"
-        >
-          <div className="flex items-center space-x-2">
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-            </svg>
-            <span>Add New Vendor</span>
-          </div>
-        </button>
+        {canCreateVendors() && (
+          <button
+            onClick={() => setShowAddModal(true)}
+            className="group relative bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white px-6 py-3 rounded-2xl font-semibold shadow-lg shadow-emerald-500/25 hover:shadow-emerald-500/40 transition-all duration-300 hover:-translate-y-0.5"
+          >
+            <div className="flex items-center space-x-2">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+              <span>Add New Vendor</span>
+            </div>
+          </button>
+        )}
       </div>
 
       {/* Main Content */}
@@ -293,12 +317,14 @@ export default function VendorsPage() {
           </div>
           <h3 className="text-2xl font-bold text-slate-100 mb-2">No Vendors Yet</h3>
           <p className="text-slate-400 mb-6">Get started by adding your first vendor partner</p>
+          {canCreateVendors() && (
           <button
             onClick={() => setShowAddModal(true)}
             className="bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white px-8 py-3 rounded-xl font-semibold shadow-lg shadow-emerald-500/25 transition-all duration-300 hover:-translate-y-0.5"
           >
             Add First Vendor
           </button>
+          )}
         </div>
       ) : (
         <div className="space-y-6">
@@ -416,19 +442,23 @@ export default function VendorsPage() {
                       </td>
                       <td className="px-6 py-4">
                         <div className="flex flex-wrap gap-2">
-                          <button
-                            onClick={() => openAssignModal(vendor)}
-                            className="px-3 py-1 bg-violet-500/20 text-violet-400 hover:bg-violet-500/30 rounded-lg text-xs font-medium transition-all duration-200 border border-violet-500/30"
-                          >
-                            Assign Package
-                          </button>
-                          <button
-                            onClick={() => openPasswordModal(vendor)}
-                            className="px-3 py-1 bg-slate-700/40 text-slate-200 hover:bg-slate-600/50 border border-slate-600/50 rounded-lg text-xs font-medium transition-all duration-200"
-                          >
-                            Set Password
-                          </button>
-                          {vendor.status !== 'active' && (
+                          {isMainAdmin() && (
+                            <>
+                              <button
+                                onClick={() => openAssignModal(vendor)}
+                                className="px-3 py-1 bg-violet-500/20 text-violet-400 hover:bg-violet-500/30 rounded-lg text-xs font-medium transition-all duration-200 border border-violet-500/30"
+                              >
+                                Assign Package
+                              </button>
+                              <button
+                                onClick={() => openPasswordModal(vendor)}
+                                className="px-3 py-1 bg-slate-700/40 text-slate-200 hover:bg-slate-600/50 border border-slate-600/50 rounded-lg text-xs font-medium transition-all duration-200"
+                              >
+                                Set Password
+                              </button>
+                            </>
+                          )}
+                          {canApproveVendors() && vendor.status !== 'active' && (
                             <button
                               onClick={() => updateVendorStatus(vendor._id, 'active')}
                               disabled={statusLoading === vendor._id}
@@ -437,7 +467,7 @@ export default function VendorsPage() {
                               {statusLoading === vendor._id ? 'Approving...' : 'Approve'}
                             </button>
                           )}
-                          {vendor.status !== 'rejected' && (
+                          {canApproveVendors() && vendor.status !== 'rejected' && (
                             <button
                               onClick={() => updateVendorStatus(vendor._id, 'rejected')}
                               disabled={statusLoading === vendor._id}

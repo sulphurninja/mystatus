@@ -44,6 +44,26 @@ export default function AdvertisementsPage() {
   const [uploading, setUploading] = useState(false);
   const [editingAd, setEditingAd] = useState<Advertisement | null>(null);
 
+  const getAdminUser = () => {
+    if (typeof window === 'undefined') return null;
+    try {
+      const raw = localStorage.getItem('adminUser');
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  };
+
+  const canAddAdvertisements = () => {
+    const admin = getAdminUser();
+    return admin?.role !== 'sub-admin' || admin?.permissions?.includes('advertisements.create');
+  };
+
+  const canApproveAdvertisements = () => {
+    const admin = getAdminUser();
+    return admin?.role !== 'sub-admin' || admin?.permissions?.includes('advertisements.approve');
+  };
+
   const getAuthHeaders = () => {
     const token = typeof window !== 'undefined' ? localStorage.getItem('adminToken') : null;
     return token ? { Authorization: `Bearer ${token}` } : {};
@@ -381,17 +401,19 @@ export default function AdvertisementsPage() {
             <option value="active">Active</option>
             <option value="inactive">Inactive</option>
           </select>
-          <button
-            onClick={() => setShowAddModal(true)}
-            className="group relative bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white px-6 py-4 rounded-2xl font-semibold shadow-lg shadow-emerald-500/25 hover:shadow-emerald-500/40 transition-all duration-300 hover:-translate-y-0.5"
-          >
-            <div className="flex items-center space-x-2">
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-              </svg>
-              <span>Add Advertisement</span>
-            </div>
-          </button>
+          {canAddAdvertisements() && (
+            <button
+              onClick={() => setShowAddModal(true)}
+              className="group relative bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white px-6 py-4 rounded-2xl font-semibold shadow-lg shadow-emerald-500/25 hover:shadow-emerald-500/40 transition-all duration-300 hover:-translate-y-0.5"
+            >
+              <div className="flex items-center space-x-2">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
+                <span>Add Advertisement</span>
+              </div>
+            </button>
+          )}
         </div>
       </div>
 
@@ -426,7 +448,7 @@ export default function AdvertisementsPage() {
           <p className="text-slate-400 mb-6">
             {searchTerm ? 'Try adjusting your search terms' : 'Get started by creating your first advertisement'}
           </p>
-          {!searchTerm && (
+          {!searchTerm && canAddAdvertisements() && (
             <button
               onClick={() => setShowAddModal(true)}
               className="bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white px-8 py-3 rounded-xl font-semibold shadow-lg shadow-emerald-500/25 transition-all duration-300 hover:-translate-y-0.5"
@@ -524,27 +546,33 @@ export default function AdvertisementsPage() {
 
                   {/* Actions */}
                   <div className="flex space-x-2">
-                    <button
-                      onClick={() => toggleAdStatus(ad._id)}
-                      className={`px-3 py-2 rounded-xl text-xs font-medium transition-all duration-200 ${ad.isActive
-                        ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30 border border-red-500/30'
-                        : 'bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 border border-emerald-500/30'
-                        }`}
-                    >
-                      {ad.isActive ? 'Deactivate' : 'Activate'}
-                    </button>
-                    <button
-                      onClick={() => editAd(ad)}
-                      className="px-3 py-2 bg-blue-500/20 text-blue-400 hover:bg-blue-500/30 rounded-xl text-xs font-medium transition-all duration-200 border border-blue-500/30"
-                    >
-                      Edit
-                    </button>
-                    <button
-                      onClick={() => deleteAd(ad._id)}
-                      className="px-3 py-2 bg-red-500/20 text-red-400 hover:bg-red-500/30 rounded-xl text-xs font-medium transition-all duration-200 border border-red-500/30"
-                    >
-                      Delete
-                    </button>
+                    {canApproveAdvertisements() && (
+                      <button
+                        onClick={() => toggleAdStatus(ad._id)}
+                        className={`px-3 py-2 rounded-xl text-xs font-medium transition-all duration-200 ${ad.isActive
+                          ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30 border border-red-500/30'
+                          : 'bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 border border-emerald-500/30'
+                          }`}
+                      >
+                        {ad.isActive ? 'Deactivate' : 'Activate'}
+                      </button>
+                    )}
+                    {canAddAdvertisements() && (
+                      <>
+                        <button
+                          onClick={() => editAd(ad)}
+                          className="px-3 py-2 bg-blue-500/20 text-blue-400 hover:bg-blue-500/30 rounded-xl text-xs font-medium transition-all duration-200 border border-blue-500/30"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => deleteAd(ad._id)}
+                          className="px-3 py-2 bg-red-500/20 text-red-400 hover:bg-red-500/30 rounded-xl text-xs font-medium transition-all duration-200 border border-red-500/30"
+                        >
+                          Delete
+                        </button>
+                      </>
+                    )}
                   </div>
                 </div>
               </div>

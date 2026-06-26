@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { generateToken } from '@/middleware/auth';
+import connectToDatabase from '@/lib/mongodb';
+import SubAdmin from '@/models/SubAdmin';
 
 export async function POST(request: NextRequest) {
   try {
@@ -17,10 +19,41 @@ export async function POST(request: NextRequest) {
     const adminPassword = process.env.ADMIN_PASSWORD || 'admin123';
 
     if (email !== adminEmail || password !== adminPassword) {
-      return NextResponse.json(
-        { success: false, message: 'Invalid admin credentials' },
-        { status: 401 }
-      );
+      await connectToDatabase();
+
+      const subAdmin = await SubAdmin.findOne({
+        email: email.trim().toLowerCase(),
+        isActive: true
+      }).select('+password');
+
+      if (!subAdmin || !(await subAdmin.comparePassword(password))) {
+        return NextResponse.json(
+          { success: false, message: 'Invalid admin credentials' },
+          { status: 401 }
+        );
+      }
+
+      subAdmin.lastLoginAt = new Date();
+      await subAdmin.save();
+
+      const token = generateToken(subAdmin._id.toString(), 'sub-admin');
+
+      return NextResponse.json({
+        success: true,
+        message: 'Sub-admin login successful',
+        data: {
+          admin: {
+            id: subAdmin._id,
+            name: subAdmin.name,
+            email: subAdmin.email,
+            phone: subAdmin.phone,
+            profileImage: subAdmin.profileImage,
+            role: 'sub-admin',
+            permissions: subAdmin.permissions
+          },
+          token
+        }
+      });
     }
 
     // Generate token with admin type
@@ -32,7 +65,8 @@ export async function POST(request: NextRequest) {
       data: {
         admin: {
           email: adminEmail,
-          role: 'admin'
+          role: 'admin',
+          permissions: ['*']
         },
         token
       }

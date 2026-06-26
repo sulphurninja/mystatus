@@ -1,9 +1,12 @@
-import jwt from 'jsonwebtoken';
-import { NextRequest, NextResponse } from 'next/server';
+import jwt, { SignOptions } from 'jsonwebtoken';
+import { NextRequest } from 'next/server';
+import connectToDatabase from '@/lib/mongodb';
+import SubAdmin from '@/models/SubAdmin';
+import { AdminPermission, hasAdminPermission } from '@/lib/adminPermissions';
 
 export interface JWTPayload {
   id: string;
-  type: 'user' | 'vendor' | 'admin' | 'verification';
+  type: 'user' | 'vendor' | 'admin' | 'sub-admin' | 'verification';
 }
 
 export function verifyToken(token: string): JWTPayload | null {
@@ -25,7 +28,7 @@ export function getTokenFromRequest(request: NextRequest): string | null {
 
 export function authenticateRequest(
   request: NextRequest,
-  allowedTypes: ('user' | 'vendor' | 'admin' | 'verification')[] = ['user', 'vendor', 'admin']
+  allowedTypes: ('user' | 'vendor' | 'admin' | 'sub-admin' | 'verification')[] = ['user', 'vendor', 'admin']
 ) {
   const token = getTokenFromRequest(request);
 
@@ -58,10 +61,67 @@ export function authenticateRequest(
   };
 }
 
-export function generateToken(id: string, type: 'user' | 'vendor' | 'admin' | 'verification'): string {
+export function generateToken(id: string, type: 'user' | 'vendor' | 'admin' | 'sub-admin' | 'verification'): string {
+  const options: SignOptions = {
+    expiresIn: (process.env.JWT_EXPIRE || '7d') as SignOptions['expiresIn'],
+  };
+
   return jwt.sign(
     { id, type },
     process.env.JWT_SECRET || 'fallback-secret',
-    { expiresIn: process.env.JWT_EXPIRE || '7d' }
+    options
   );
+}
+
+export async function authorizeAdminRequest(
+  request: NextRequest,
+  requiredPermissions?: AdminPermission | AdminPermission[]
+) {
+  const auth = authenticateRequest(request, ['admin', 'sub-admin']);
+
+  if (auth.error || !auth.user) {
+    return {
+      error: auth.error || { message: 'Authentication failed', status: 401 },
+      user: null,
+      subAdmin: null,
+      isMainAdmin: false,
+    };
+  }
+
+  if (auth.user.type === 'admin') {
+    return {
+      error: null,
+      user: auth.user,
+      subAdmin: null,
+      isMainAdmin: true,
+    };
+  }
+
+  await connectToDatabase();
+  const subAdmin = await SubAdmin.findById(auth.user.id).select('-password');
+
+  if (!subAdmin || !subAdmin.isActive) {
+    return {
+      error: { message: 'Sub-admin account is inactive or not found', status: 403 },
+      user: auth.user,
+      subAdmin: null,
+      isMainAdmin: false,
+    };
+  }
+
+  if (requiredPermissions && !hasAdminPermission(subAdmin.permissions, requiredPermissions)) {
+    return {
+      error: { message: 'Sub-admin does not have permission for this action', status: 403 },
+      user: auth.user,
+      subAdmin,
+      isMainAdmin: false,
+    };
+  }
+
+  return {
+    error: null,
+    user: auth.user,
+    subAdmin,
+    isMainAdmin: false,
+  };
 }

@@ -15,7 +15,7 @@ cloudinary.config({
 
 export async function POST(request: NextRequest) {
   try {
-    const auth = authenticateRequest(request, ['admin', 'user', 'vendor']);
+    const auth = authenticateRequest(request, ['admin', 'sub-admin', 'user', 'vendor']);
     if (auth.error) {
       return NextResponse.json(
         { success: false, message: auth.error.message },

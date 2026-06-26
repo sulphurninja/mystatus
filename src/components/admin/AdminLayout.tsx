@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
+import { AdminPermission, ADMIN_NAV_PERMISSIONS, hasAdminPermission, normalizePermissions } from '@/lib/adminPermissions';
 
 interface AdminLayoutProps {
   children: React.ReactNode;
@@ -31,6 +32,12 @@ const navigation = [
     name: 'Advertisements',
     href: '/admin/advertisements',
     icon: 'Megaphone',
+    current: false
+  },
+  {
+    name: 'Sub Admins',
+    href: '/admin/sub-admins',
+    icon: 'Users',
     current: false
   },
   {
@@ -117,6 +124,8 @@ const navigation = [
 export default function AdminLayout({ children }: AdminLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [darkMode, setDarkMode] = useState(false);
+  const [adminRole, setAdminRole] = useState<'admin' | 'sub-admin'>('admin');
+  const [adminPermissions, setAdminPermissions] = useState<AdminPermission[]>([]);
   const pathname = usePathname();
   const router = useRouter();
 
@@ -134,6 +143,32 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     }
   }, []);
 
+  useEffect(() => {
+    const cachedAdmin = localStorage.getItem('adminUser');
+    if (cachedAdmin) {
+      try {
+        const parsed = JSON.parse(cachedAdmin);
+        setAdminRole(parsed.role === 'sub-admin' ? 'sub-admin' : 'admin');
+        setAdminPermissions(normalizePermissions(parsed.permissions));
+      } catch {}
+    }
+
+    const token = localStorage.getItem('adminToken');
+    if (!token) return;
+
+    fetch('/api/admin/me', {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((res) => res.ok ? res.json() : null)
+      .then((data) => {
+        if (!data?.success) return;
+        localStorage.setItem('adminUser', JSON.stringify(data.admin));
+        setAdminRole(data.admin.role === 'sub-admin' ? 'sub-admin' : 'admin');
+        setAdminPermissions(normalizePermissions(data.admin.permissions));
+      })
+      .catch(() => {});
+  }, []);
+
   const toggleDarkMode = () => {
     const newDarkMode = !darkMode;
     setDarkMode(newDarkMode);
@@ -148,8 +183,17 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
 
   const handleLogout = () => {
     localStorage.removeItem('adminToken');
+    localStorage.removeItem('adminUser');
     router.push('/admin/login');
   };
+
+  const visibleNavigation = navigation.filter((item) => {
+    if (adminRole === 'admin') return true;
+    const requiredPermissions = ADMIN_NAV_PERMISSIONS[item.href];
+    if (!requiredPermissions) return false;
+    if (requiredPermissions.length === 0) return false;
+    return hasAdminPermission(adminPermissions, requiredPermissions);
+  });
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
@@ -216,7 +260,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
             {/* Navigation */}
             <nav className="flex-1 px-4 py-6">
               <div className="space-y-2">
-              {navigation.map((item) => {
+              {visibleNavigation.map((item) => {
                 const isActive = pathname === item.href;
                 return (
                   <Link
@@ -376,7 +420,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
             {/* Navigation */}
             <nav className="flex-1 px-4 py-6">
               <div className="space-y-2">
-              {navigation.map((item) => {
+              {visibleNavigation.map((item) => {
                 const isActive = pathname === item.href;
                 return (
                   <Link

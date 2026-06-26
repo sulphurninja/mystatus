@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import connectToDatabase from '@/lib/mongodb';
 import Vendor from '@/models/Vendor';
-import { authenticateRequest } from '@/middleware/auth';
+import { authorizeAdminRequest } from '@/middleware/auth';
 
 export async function GET(request: NextRequest) {
   try {
-    const auth = authenticateRequest(request, ['admin']);
+    const auth = await authorizeAdminRequest(request, ['vendors.create', 'vendors.approve']);
     if (auth.error) {
       return NextResponse.json(
         { success: false, message: auth.error.message },
@@ -49,7 +49,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const auth = authenticateRequest(request, ['admin']);
+    const auth = await authorizeAdminRequest(request, 'vendors.create');
     if (auth.error) {
       return NextResponse.json(
         { success: false, message: auth.error.message },

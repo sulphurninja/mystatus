@@ -3,11 +3,11 @@ import connectToDatabase from '@/lib/mongodb';
 import Vendor from '@/models/Vendor';
 import VendorPackage from '@/models/VendorPackage';
 import Transaction from '@/models/Transaction';
-import { authenticateRequest } from '@/middleware/auth';
+import { authorizeAdminRequest } from '@/middleware/auth';
 
 export async function PATCH(request: NextRequest) {
   try {
-    const auth = authenticateRequest(request, ['admin']);
+    const auth = await authorizeAdminRequest(request, 'vendors.approve');
     if (auth.error) {
       return NextResponse.json({ success: false, message: auth.error.message }, { status: auth.error.status });
     }
