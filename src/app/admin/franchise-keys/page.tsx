@@ -1,9 +1,16 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Input } from '@/components/ui/input';
-import { useToast } from '@/hooks/use-toast';
-import { CheckCircle2, Loader2, Plus } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { Key } from 'lucide-react';
+import PageHeader from '@/components/admin/PageHeader';
+import StatStrip from '@/components/admin/StatStrip';
+import DataTable, { DataTableColumn } from '@/components/admin/DataTable';
+import Pagination from '@/components/admin/Pagination';
+import FilterBar from '@/components/admin/FilterBar';
+import AdminModal from '@/components/admin/AdminModal';
+import StatusPill from '@/components/admin/StatusPill';
+import { useAdminPagination } from '@/hooks/useAdminPagination';
 
 type FranchiseKeyItem = {
   _id: string;
@@ -23,28 +30,31 @@ type FranchiseKeyItem = {
 };
 
 export default function FranchiseKeysPage() {
-  const { toast } = useToast();
+  const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [keys, setKeys] = useState<FranchiseKeyItem[]>([]);
   const [count, setCount] = useState(10);
   const [price, setPrice] = useState(10000);
   const [isForSale, setIsForSale] = useState(true);
+  const [showGenerateModal, setShowGenerateModal] = useState(false);
   const [showActiveOnly, setShowActiveOnly] = useState(false);
+  const [message, setMessage] = useState('');
+  const pagination = useAdminPagination(25);
 
   useEffect(() => {
-    checkAuth();
-    loadKeys();
-  }, []);
-
-  const checkAuth = () => {
     const token = localStorage.getItem('adminToken');
     if (!token) {
-      window.location.href = '/admin/login';
+      router.push('/admin/login');
     }
-  };
+  }, [router]);
 
-  const getAuthHeaders = () => {
+  useEffect(() => {
+    loadKeys();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pagination.page, pagination.limit]);
+
+  const getAuthHeaders = (): Record<string, string> => {
     const token = typeof window !== 'undefined' ? localStorage.getItem('adminToken') : null;
     return token ? { Authorization: `Bearer ${token}` } : {};
   };
@@ -52,28 +62,27 @@ export default function FranchiseKeysPage() {
   const loadKeys = async () => {
     try {
       setLoading(true);
-      const res = await fetch('/api/admin/franchise-keys', {
+      const params = new URLSearchParams({
+        page: String(pagination.page),
+        limit: String(pagination.limit),
+      });
+      const res = await fetch(`/api/admin/franchise-keys?${params}`, {
         headers: {
           'Content-Type': 'application/json',
-          ...getAuthHeaders()
-        }
+          ...getAuthHeaders(),
+        },
       });
       const data = await res.json();
       if (data.success) {
         setKeys(data.keys || []);
+        pagination.setFromResponse(data.pagination || {});
       } else {
-        toast({
-          title: 'Error',
-          description: data.message || 'Failed to load franchise keys',
-          variant: 'destructive'
-        });
+        setKeys([]);
+        setMessage(data.message || 'Failed to load franchise keys');
       }
     } catch {
-      toast({
-        title: 'Error',
-        description: 'Failed to load franchise keys',
-        variant: 'destructive'
-      });
+      setKeys([]);
+      setMessage('Failed to load franchise keys');
     } finally {
       setLoading(false);
     }
@@ -82,35 +91,26 @@ export default function FranchiseKeysPage() {
   const generateKeys = async () => {
     try {
       setSaving(true);
+      setMessage('');
       const res = await fetch('/api/admin/franchise-keys', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          ...getAuthHeaders()
+          ...getAuthHeaders(),
         },
-        body: JSON.stringify({ count, price, isForSale })
+        body: JSON.stringify({ count, price, isForSale }),
       });
 
       const data = await res.json();
       if (data.success) {
-        toast({
-          title: 'Success',
-          description: data.message || 'Franchise keys generated'
-        });
+        setMessage(data.message || 'Franchise keys generated');
+        setShowGenerateModal(false);
         await loadKeys();
       } else {
-        toast({
-          title: 'Error',
-          description: data.message || 'Failed to generate keys',
-          variant: 'destructive'
-        });
+        setMessage(data.message || 'Failed to generate keys');
       }
     } catch {
-      toast({
-        title: 'Error',
-        description: 'Failed to generate keys',
-        variant: 'destructive'
-      });
+      setMessage('Failed to generate keys');
     } finally {
       setSaving(false);
     }
@@ -122,8 +122,8 @@ export default function FranchiseKeysPage() {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
-          ...getAuthHeaders()
-        }
+          ...getAuthHeaders(),
+        },
       });
       const data = await res.json();
       if (!res.ok || !data.success) {
@@ -131,169 +131,233 @@ export default function FranchiseKeysPage() {
       }
       await loadKeys();
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to toggle payout plan';
-      toast({
-        title: 'Error',
-        description: message,
-        variant: 'destructive'
-      });
+      const msg = error instanceof Error ? error.message : 'Failed to toggle payout plan';
+      setMessage(msg);
     }
   };
 
-  const activeKeys = keys.filter((item) => item.isUsed);
-  const activeFranchiseKeys = activeKeys.length;
-  const displayedKeys = showActiveOnly ? activeKeys : keys;
+  const displayedKeys = showActiveOnly ? keys.filter((item) => item.isUsed) : keys;
 
-  if (loading) {
-    return (
-      <div className="p-6 lg:p-8 space-y-8">
-        <div className="flex items-center justify-center h-64">
-          <Loader2 className="h-8 w-8 animate-spin text-amber-400" />
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="p-6 lg:p-8 space-y-8">
-      <div className="space-y-2">
-        <div className="flex items-center space-x-3">
-          <div className="w-1 h-8 bg-gradient-to-b from-amber-400 to-orange-500 rounded-full" />
-          <h1 className="text-4xl font-bold bg-gradient-to-r from-slate-100 to-slate-300 bg-clip-text text-transparent">
-            Franchise Keys
-          </h1>
-        </div>
-        <p className="text-slate-400 text-lg font-medium">
-          Generate and manage franchise keys for recurring payouts
-        </p>
-      </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-        <button
-          type="button"
-          onClick={() => setShowActiveOnly(true)}
-          className={`bg-slate-900/60 border rounded-2xl p-6 text-left transition-all duration-300 hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/70 ${
-            showActiveOnly
-              ? 'border-emerald-500/60 shadow-lg shadow-emerald-500/10'
-              : 'border-slate-800 hover:border-emerald-500/40'
-          }`}
-        >
-          <div className="flex items-center justify-between gap-4">
+  const columns: DataTableColumn<FranchiseKeyItem>[] = [
+      {
+        key: 'key',
+        header: 'Key',
+        render: (row) => (
+          <code className="text-xs font-mono text-[var(--admin-muted)]">{row.key}</code>
+        ),
+      },
+      {
+        key: 'price',
+        header: 'Price',
+        render: (row) => (
+          <span className="tabular-nums">₹{Number(row.price || 0).toFixed(2)}</span>
+        ),
+      },
+      {
+        key: 'status',
+        header: 'Status',
+        render: (row) => (
+          <div className="space-y-1">
+            <StatusPill tone={row.isUsed ? 'success' : 'neutral'}>
+              {row.isUsed ? 'Used' : 'Unused'}
+            </StatusPill>
             <div>
-              <p className="text-sm font-medium text-slate-400">Active Franchise Keys</p>
-              <p className="mt-3 text-4xl font-bold text-slate-100">{activeFranchiseKeys}</p>
-            </div>
-            <div className="h-12 w-12 rounded-2xl bg-emerald-500/15 text-emerald-300 flex items-center justify-center">
-              <CheckCircle2 className="h-6 w-6" />
+              <StatusPill tone={row.isForSale ? 'warning' : 'neutral'}>
+                {row.isForSale ? 'For sale' : 'Not for sale'}
+              </StatusPill>
             </div>
           </div>
-          <p className="mt-4 text-xs text-slate-500">Click to view active key list</p>
-        </button>
-      </div>
+        ),
+      },
+      {
+        key: 'usedBy',
+        header: 'Used by',
+        render: (row) =>
+          row.usedBy ? (
+            <div>
+              <p className="font-medium">{row.usedBy.name}</p>
+              <p className="text-xs text-[var(--admin-muted)]">{row.usedBy.email}</p>
+            </div>
+          ) : (
+            <span className="text-[var(--admin-faint)]">—</span>
+          ),
+      },
+      {
+        key: 'payout',
+        header: 'Payout',
+        render: (row) =>
+          row.payoutPlan ? (
+            <StatusPill tone={row.payoutPlan.isActive ? 'success' : 'danger'}>
+              {row.payoutPlan.isActive ? 'Active' : 'Paused'}
+            </StatusPill>
+          ) : (
+            <span className="text-[var(--admin-faint)]">—</span>
+          ),
+      },
+      {
+        key: 'actions',
+        header: 'Actions',
+        render: (row) =>
+          row.payoutPlan ? (
+            <button
+              type="button"
+              onClick={() => togglePlan(row.payoutPlan!.id)}
+              className="admin-btn admin-btn-secondary !py-1.5 !px-3"
+            >
+              {row.payoutPlan.isActive ? 'Pause' : 'Resume'}
+            </button>
+          ) : (
+            <span className="text-xs text-[var(--admin-faint)]">—</span>
+          ),
+      },
+    ];
 
-      <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-6 space-y-4">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+  return (
+    <div className="space-y-6">
+      <PageHeader
+        icon={Key}
+        title="Franchise keys"
+        description="Generate and manage franchise keys for recurring payouts"
+        actions={
+          <button
+            type="button"
+            onClick={() => setShowGenerateModal(true)}
+            className="admin-btn admin-btn-primary"
+          >
+            Generate keys
+          </button>
+        }
+      />
+
+      {message ? (
+        <div className="admin-panel px-4 py-3 text-sm">{message}</div>
+      ) : null}
+
+      <StatStrip
+        items={[
+          { label: 'Total keys', value: pagination.total },
+          {
+            label: 'Used (page)',
+            value: keys.filter((k) => k.isUsed).length,
+            hint: 'Current page',
+          },
+          {
+            label: 'For sale (page)',
+            value: keys.filter((k) => k.isForSale && !k.isUsed).length,
+            hint: 'Current page',
+          },
+          { label: 'Showing', value: displayedKeys.length },
+        ]}
+      />
+
+      <FilterBar>
+        <button
+          type="button"
+          className={`admin-btn ${showActiveOnly ? 'admin-btn-primary' : 'admin-btn-secondary'}`}
+          onClick={() => setShowActiveOnly((v) => !v)}
+        >
+          {showActiveOnly ? 'Show all on page' : 'Active only (page)'}
+        </button>
+      </FilterBar>
+
+      <DataTable
+        columns={columns}
+        rows={displayedKeys}
+        rowKey={(k) => k._id}
+        loading={loading}
+        emptyTitle="No franchise keys"
+        emptyDescription={
+          showActiveOnly
+            ? 'No used keys on this page'
+            : 'Generate franchise keys to get started'
+        }
+        emptyAction={
+          !showActiveOnly ? (
+            <button
+              type="button"
+              onClick={() => setShowGenerateModal(true)}
+              className="admin-btn admin-btn-primary"
+            >
+              Generate keys
+            </button>
+          ) : undefined
+        }
+        footer={
+          <Pagination
+            page={pagination.page}
+            totalPages={pagination.totalPages}
+            total={pagination.total}
+            limit={pagination.limit}
+            onPageChange={pagination.setPage}
+            onLimitChange={pagination.setLimit}
+            limitOptions={[10, 25, 50]}
+          />
+        }
+      />
+
+      <AdminModal
+        open={showGenerateModal}
+        title="Generate franchise keys"
+        onClose={() => setShowGenerateModal(false)}
+        footer={
+          <>
+            <button
+              type="button"
+              className="admin-btn admin-btn-secondary"
+              onClick={() => setShowGenerateModal(false)}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="admin-btn admin-btn-primary"
+              disabled={saving}
+              onClick={generateKeys}
+            >
+              {saving ? 'Generating…' : 'Generate keys'}
+            </button>
+          </>
+        }
+      >
+        <div className="space-y-4">
           <div>
-            <label className="text-sm text-slate-400 mb-2 block">Count</label>
-            <Input
+            <label className="admin-label">Count</label>
+            <input
               type="number"
-              value={count}
               min={1}
               max={100}
-              onChange={(e) => setCount(parseInt(e.target.value) || 0)}
-              className="bg-slate-800/60 border-slate-700/50 text-slate-100"
+              className="admin-input"
+              value={count}
+              onChange={(e) => setCount(parseInt(e.target.value, 10) || 0)}
             />
           </div>
           <div>
-            <label className="text-sm text-slate-400 mb-2 block">Price (INR)</label>
-            <Input
+            <label className="admin-label">Price (INR)</label>
+            <input
               type="number"
-              value={price}
               min={0}
               step="0.01"
+              className="admin-input"
+              value={price}
               onChange={(e) => {
                 const next = parseFloat(e.target.value);
                 setPrice(Number.isFinite(next) ? next : 0);
               }}
-              className="bg-slate-800/60 border-slate-700/50 text-slate-100"
             />
           </div>
           <div>
-            <label className="text-sm text-slate-400 mb-2 block">For Sale</label>
+            <label className="admin-label">For sale</label>
             <select
+              className="admin-input"
               value={isForSale ? 'yes' : 'no'}
               onChange={(e) => setIsForSale(e.target.value === 'yes')}
-              className="border-input h-9 w-full min-w-0 rounded-md border bg-slate-800/60 px-3 py-1 text-base shadow-xs transition-[color,box-shadow] outline-none md:text-sm text-slate-100"
             >
               <option value="yes">Yes</option>
               <option value="no">No</option>
             </select>
           </div>
         </div>
-        <button
-          onClick={generateKeys}
-          disabled={saving}
-          className="px-5 py-3 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white font-semibold shadow-lg shadow-amber-500/25 hover:shadow-amber-500/40 transition-all duration-300 hover:-translate-y-0.5 disabled:opacity-60 disabled:cursor-not-allowed flex items-center gap-2"
-        >
-          {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-          Generate Keys
-        </button>
-      </div>
-
-      <div className="bg-slate-900/60 border border-slate-800 rounded-2xl overflow-hidden">
-        <div className="px-6 py-4 border-b border-slate-800 flex items-center justify-between gap-4">
-          <div>
-            <p className="text-slate-300 font-semibold">
-              {showActiveOnly ? 'Active Franchise Keys' : 'Recent Keys'}
-            </p>
-            {showActiveOnly && (
-              <p className="mt-1 text-xs text-slate-500">
-                Showing {activeFranchiseKeys} keys currently used by users
-              </p>
-            )}
-          </div>
-          {showActiveOnly && (
-            <button
-              type="button"
-              onClick={() => setShowActiveOnly(false)}
-              className="px-3 py-1.5 rounded-lg border border-slate-700 text-xs font-semibold text-slate-200 hover:bg-slate-800/70"
-            >
-              Show all
-            </button>
-          )}
-        </div>
-        <div className="divide-y divide-slate-800">
-          {displayedKeys.length === 0 ? (
-            <div className="p-6 text-slate-500">No franchise keys found.</div>
-          ) : (
-            displayedKeys.map((item) => (
-              <div key={item._id} className="px-6 py-4 flex flex-col gap-1">
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-200 font-semibold">{item.key}</span>
-                  <span className="text-amber-300 font-semibold">INR {Number(item.price || 0).toFixed(2)}</span>
-                </div>
-                <div className="text-xs text-slate-500">
-                  {item.isUsed ? `Used by ${item.usedBy?.name || 'User'}` : 'Not used'}
-                  {item.isForSale ? ' · For sale' : ' · Not for sale'}
-                </div>
-                {item.payoutPlan && (
-                  <div className="flex items-center justify-between mt-2">
-                    <span className={`text-xs font-semibold ${item.payoutPlan.isActive ? 'text-emerald-400' : 'text-red-400'}`}>
-                      {item.payoutPlan.isActive ? 'Payout Active' : 'Payout Paused'}
-                    </span>
-                    <button
-                      onClick={() => togglePlan(item.payoutPlan!.id)}
-                      className="px-3 py-1 text-xs rounded-lg border border-slate-700 text-slate-200 hover:bg-slate-800/60"
-                    >
-                      {item.payoutPlan.isActive ? 'Pause' : 'Resume'}
-                    </button>
-                  </div>
-                )}
-              </div>
-            ))
-          )}
-        </div>
-      </div>
+      </AdminModal>
     </div>
   );
 }

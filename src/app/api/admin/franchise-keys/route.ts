@@ -18,13 +18,23 @@ export async function GET(request: NextRequest) {
 
     await connectToDatabase();
 
-    const keys = await FranchiseKey.find()
-      .populate('usedBy', 'name email')
-      .populate('soldBy', 'name email')
-      .populate('purchasedBy', 'name email')
-      .populate('createdBy', 'name email')
-      .populate('tierId', 'name minPrice maxPrice')
-      .sort({ createdAt: -1 });
+    const { searchParams } = new URL(request.url);
+    const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(searchParams.get('limit') || '25', 10) || 25));
+    const skip = (page - 1) * limit;
+
+    const [keys, total] = await Promise.all([
+      FranchiseKey.find()
+        .populate('usedBy', 'name email')
+        .populate('soldBy', 'name email')
+        .populate('purchasedBy', 'name email')
+        .populate('createdBy', 'name email')
+        .populate('tierId', 'name minPrice maxPrice')
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit),
+      FranchiseKey.countDocuments(),
+    ]);
 
     const plans = await FranchisePayoutPlan.find({
       franchiseKey: { $in: keys.map(key => key._id) }
@@ -75,7 +85,14 @@ export async function GET(request: NextRequest) {
           email: key.createdBy.email
         } : null,
         createdAt: key.createdAt
-      }))
+      })),
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.max(1, Math.ceil(total / limit) || 1),
+        pages: Math.max(1, Math.ceil(total / limit) || 1),
+      }
     });
   } catch (error: any) {
     console.error('Get franchise keys error:', error);

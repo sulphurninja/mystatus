@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import connectToDatabase from '@/lib/mongodb';
 import Advertisement from '@/models/Advertisement';
 import { authorizeAdminRequest } from '@/middleware/auth';
+import { detectAdMediaType } from '@/lib/adMedia';
 
 export async function PUT(
   request: NextRequest,
@@ -19,7 +20,7 @@ export async function PUT(
     await connectToDatabase();
 
     const { adId } = await params;
-    const { title, description, image, rewardAmount, vendorId, verificationPeriodHours, commissionEnabled, commissionNote } = await request.json();
+    const { title, description, image, mediaType, rewardAmount, vendorId, verificationPeriodHours, commissionEnabled, commissionNote } = await request.json();
 
     const advertisement = await Advertisement.findByIdAndUpdate(
       adId,
@@ -27,6 +28,7 @@ export async function PUT(
         title,
         description,
         image,
+        mediaType: detectAdMediaType(image, mediaType),
         rewardAmount: parseFloat(rewardAmount),
         vendor: vendorId,
         verificationPeriodHours: verificationPeriodHours !== undefined ? parseInt(verificationPeriodHours) : 8,
@@ -51,6 +53,7 @@ export async function PUT(
         title: advertisement.title,
         description: advertisement.description,
         image: advertisement.image,
+        mediaType: detectAdMediaType(advertisement.image, (advertisement as any).mediaType),
         rewardAmount: advertisement.rewardAmount,
         vendor: advertisement.vendor,
         isActive: advertisement.isActive,

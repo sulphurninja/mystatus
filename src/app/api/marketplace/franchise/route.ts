@@ -128,6 +128,8 @@ export async function POST(request: NextRequest) {
       }
 
       const now = new Date();
+      // Store as UTC date-only so the plan is eligible for the purchase day's payout run
+      const startDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
 
       const plan = await FranchisePayoutPlan.create([{
         franchiseKey: key._id,
@@ -135,7 +137,7 @@ export async function POST(request: NextRequest) {
         tier: tier._id,
         dailyCommissions: tier.dailyCommissions,
         maxLevels: 30,
-        startDate: now,
+        startDate,
         isActive: true
       }], { session });
 

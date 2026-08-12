@@ -1,12 +1,20 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { UserCog } from 'lucide-react';
 import {
   ADMIN_PERMISSION_DESCRIPTIONS,
   ADMIN_PERMISSION_LABELS,
   ADMIN_PERMISSIONS,
   AdminPermission,
 } from '@/lib/adminPermissions';
+import PageHeader from '@/components/admin/PageHeader';
+import StatStrip from '@/components/admin/StatStrip';
+import DataTable, { DataTableColumn } from '@/components/admin/DataTable';
+import Pagination from '@/components/admin/Pagination';
+import AdminModal from '@/components/admin/AdminModal';
+import StatusPill from '@/components/admin/StatusPill';
+import { useAdminPagination } from '@/hooks/useAdminPagination';
 
 interface SubAdmin {
   _id: string;
@@ -38,6 +46,7 @@ export default function SubAdminsPage() {
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<SubAdmin | null>(null);
   const [form, setForm] = useState(emptyForm);
+  const pagination = useAdminPagination(20);
 
   const getAuthHeaders = (): Record<string, string> => {
     const token = typeof window !== 'undefined' ? localStorage.getItem('adminToken') : null;
@@ -47,12 +56,21 @@ export default function SubAdminsPage() {
   const loadSubAdmins = async () => {
     try {
       setLoading(true);
-      const res = await fetch('/api/admin/sub-admins', {
+      const params = new URLSearchParams({
+        page: String(pagination.page),
+        limit: String(pagination.limit),
+      });
+      const res = await fetch(`/api/admin/sub-admins?${params}`, {
         headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
       });
       const data = await res.json();
-      setSubAdmins(data.success ? data.subAdmins || [] : []);
-      if (!data.success) setMessage(data.message || 'Unable to load sub-admins');
+      if (data.success) {
+        setSubAdmins(data.subAdmins || []);
+        pagination.setFromResponse(data.pagination || {});
+      } else {
+        setSubAdmins([]);
+        setMessage(data.message || 'Unable to load sub-admins');
+      }
     } catch (error) {
       console.error('Load sub-admins error:', error);
       setMessage('Unable to load sub-admins');
@@ -63,7 +81,8 @@ export default function SubAdminsPage() {
 
   useEffect(() => {
     loadSubAdmins();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pagination.page, pagination.limit]);
 
   const togglePermission = (permission: AdminPermission) => {
     setForm((prev) => ({
@@ -155,266 +174,270 @@ export default function SubAdminsPage() {
   };
 
   const formatDate = (value?: string) =>
-    value ? new Date(value).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }) : 'Never';
+    value
+      ? new Date(value).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })
+      : 'Never';
+
+  const columns: DataTableColumn<SubAdmin>[] = [
+      {
+        key: 'profile',
+        header: 'Profile',
+        render: (subAdmin) => (
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-500/20 text-sm font-bold text-emerald-300 overflow-hidden">
+              {subAdmin.profileImage ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={subAdmin.profileImage}
+                  alt={subAdmin.name}
+                  className="h-10 w-10 object-cover"
+                />
+              ) : (
+                subAdmin.name.charAt(0).toUpperCase()
+              )}
+            </div>
+            <div>
+              <p className="font-semibold">{subAdmin.name}</p>
+              <p className="text-xs text-[var(--admin-muted)]">{subAdmin.email}</p>
+              {subAdmin.phone ? (
+                <p className="text-xs text-[var(--admin-faint)]">{subAdmin.phone}</p>
+              ) : null}
+            </div>
+          </div>
+        ),
+      },
+      {
+        key: 'permissions',
+        header: 'Permissions',
+        render: (subAdmin) => (
+          <div className="flex max-w-md flex-wrap gap-1.5">
+            {subAdmin.permissions.map((permission) => (
+              <StatusPill key={permission} tone="accent">
+                {ADMIN_PERMISSION_LABELS[permission]}
+              </StatusPill>
+            ))}
+          </div>
+        ),
+      },
+      {
+        key: 'status',
+        header: 'Status',
+        render: (subAdmin) => (
+          <StatusPill tone={subAdmin.isActive ? 'success' : 'danger'}>
+            {subAdmin.isActive ? 'Active' : 'Inactive'}
+          </StatusPill>
+        ),
+      },
+      {
+        key: 'lastLogin',
+        header: 'Last login',
+        render: (subAdmin) => (
+          <span className="text-[var(--admin-muted)]">{formatDate(subAdmin.lastLoginAt)}</span>
+        ),
+      },
+      {
+        key: 'actions',
+        header: 'Actions',
+        render: (subAdmin) => (
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => openEdit(subAdmin)}
+              className="admin-btn admin-btn-secondary !py-1.5 !px-3"
+            >
+              Edit
+            </button>
+            <button
+              type="button"
+              onClick={() => deleteSubAdmin(subAdmin)}
+              className="admin-btn admin-btn-danger !py-1.5 !px-3"
+            >
+              Delete
+            </button>
+          </div>
+        ),
+      },
+    ];
 
   return (
-    <div className="p-6 lg:p-8 space-y-8">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-        <div className="space-y-2">
-          <div className="flex items-center space-x-3">
-            <div className="w-1 h-8 bg-gradient-to-b from-emerald-400 to-teal-500 rounded-full"></div>
-            <h1 className="text-4xl font-bold bg-gradient-to-r from-slate-100 to-slate-300 bg-clip-text text-transparent">
-              Sub-Admin Profiles
-            </h1>
-          </div>
-          <p className="text-slate-400 text-lg font-medium">
-            Create restricted staff users for vendor registration, advertisement adding, and approval work.
-          </p>
-        </div>
+    <div className="space-y-6">
+      <PageHeader
+        icon={UserCog}
+        title="Sub-admins"
+        description="Create restricted staff users for vendor and advertisement workflows"
+        actions={
+          <button type="button" onClick={openCreate} className="admin-btn admin-btn-primary">
+            Create sub-admin
+          </button>
+        }
+      />
 
-        <button
-          onClick={openCreate}
-          className="bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white px-6 py-4 rounded-2xl font-semibold shadow-lg shadow-emerald-500/25 transition-all"
-        >
-          Create Sub-Admin
-        </button>
-      </div>
+      {message ? (
+        <div className="admin-panel px-4 py-3 text-sm">{message}</div>
+      ) : null}
 
-      {message && (
-        <div className="rounded-2xl border border-slate-700/50 bg-slate-800/60 px-5 py-4 text-slate-200">
-          {message}
-        </div>
-      )}
+      <StatStrip
+        items={[
+          { label: 'Total', value: pagination.total },
+          {
+            label: 'Active (page)',
+            value: subAdmins.filter((s) => s.isActive).length,
+            hint: 'Current page',
+          },
+          { label: 'Permission types', value: ADMIN_PERMISSIONS.length },
+          { label: 'On page', value: subAdmins.length },
+        ]}
+      />
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        {ADMIN_PERMISSIONS.map((permission) => (
-          <div key={permission} className="rounded-2xl border border-slate-700/50 bg-slate-800/50 p-5">
-            <p className="text-sm text-slate-400">Permission</p>
-            <p className="mt-1 text-lg font-bold text-slate-100">{ADMIN_PERMISSION_LABELS[permission]}</p>
-            <p className="mt-2 text-sm text-slate-400">{ADMIN_PERMISSION_DESCRIPTIONS[permission]}</p>
-          </div>
-        ))}
-      </div>
+      <DataTable
+        columns={columns}
+        rows={subAdmins}
+        rowKey={(s) => s._id}
+        loading={loading}
+        emptyTitle="No sub-admin profiles yet"
+        emptyDescription="Create the first restricted staff login"
+        emptyAction={
+          <button type="button" onClick={openCreate} className="admin-btn admin-btn-primary">
+            Create sub-admin
+          </button>
+        }
+        footer={
+          <Pagination
+            page={pagination.page}
+            totalPages={pagination.totalPages}
+            total={pagination.total}
+            limit={pagination.limit}
+            onPageChange={pagination.setPage}
+            onLimitChange={pagination.setLimit}
+          />
+        }
+      />
 
-      {loading ? (
-        <div className="rounded-2xl border border-slate-700/50 bg-slate-800/50 p-10 text-center text-slate-300">
-          Loading sub-admins...
-        </div>
-      ) : subAdmins.length === 0 ? (
-        <div className="rounded-2xl border border-slate-700/50 bg-slate-800/50 p-10 text-center">
-          <h3 className="text-2xl font-bold text-slate-100">No sub-admin profiles yet</h3>
-          <p className="mt-2 text-slate-400">Create the first restricted staff login for the client workflow.</p>
-        </div>
-      ) : (
-        <div className="overflow-hidden rounded-2xl border border-slate-700/50 bg-slate-800/50">
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-left text-sm text-slate-200">
-              <thead className="bg-slate-900/70 text-slate-300">
-                <tr>
-                  <th className="px-6 py-4 font-semibold">Profile</th>
-                  <th className="px-6 py-4 font-semibold">Permissions</th>
-                  <th className="px-6 py-4 font-semibold">Status</th>
-                  <th className="px-6 py-4 font-semibold">Last Login</th>
-                  <th className="px-6 py-4 font-semibold">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-700/50">
-                {subAdmins.map((subAdmin) => (
-                  <tr key={subAdmin._id} className="hover:bg-slate-800/60">
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-3">
-                        <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 text-lg font-bold text-white">
-                          {subAdmin.profileImage ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img src={subAdmin.profileImage} alt={subAdmin.name} className="h-11 w-11 rounded-xl object-cover" />
-                          ) : (
-                            subAdmin.name.charAt(0).toUpperCase()
-                          )}
-                        </div>
-                        <div>
-                          <p className="font-semibold text-slate-100">{subAdmin.name}</p>
-                          <p className="text-xs text-slate-400">{subAdmin.email}</p>
-                          {subAdmin.phone && <p className="text-xs text-slate-500">{subAdmin.phone}</p>}
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex max-w-xl flex-wrap gap-2">
-                        {subAdmin.permissions.map((permission) => (
-                          <span key={permission} className="rounded-full border border-emerald-500/30 bg-emerald-500/15 px-3 py-1 text-xs font-semibold text-emerald-300">
-                            {ADMIN_PERMISSION_LABELS[permission]}
-                          </span>
-                        ))}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className={`rounded-full px-3 py-1 text-xs font-semibold ${
-                        subAdmin.isActive
-                          ? 'border border-emerald-500/30 bg-emerald-500/15 text-emerald-300'
-                          : 'border border-red-500/30 bg-red-500/15 text-red-300'
-                      }`}>
-                        {subAdmin.isActive ? 'Active' : 'Inactive'}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-slate-300">{formatDate(subAdmin.lastLoginAt)}</td>
-                    <td className="px-6 py-4">
-                      <div className="flex flex-wrap gap-2">
-                        <button
-                          onClick={() => openEdit(subAdmin)}
-                          className="rounded-lg border border-blue-500/30 bg-blue-500/15 px-3 py-2 text-xs font-semibold text-blue-300 hover:bg-blue-500/25"
-                        >
-                          Edit
-                        </button>
-                        <button
-                          onClick={() => deleteSubAdmin(subAdmin)}
-                          className="rounded-lg border border-red-500/30 bg-red-500/15 px-3 py-2 text-xs font-semibold text-red-300 hover:bg-red-500/25"
-                        >
-                          Delete
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {showForm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
-          <div className="max-h-[92vh] w-full max-w-3xl overflow-y-auto rounded-3xl border border-slate-700/50 bg-gradient-to-br from-slate-800 to-slate-900 p-8 shadow-2xl">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <h2 className="text-2xl font-bold text-slate-100">
-                  {editing ? 'Edit Sub-Admin Profile' : 'Create Sub-Admin Profile'}
-                </h2>
-                <p className="mt-1 text-slate-400">Give access only to the forms this staff member should use.</p>
-              </div>
-              <button
-                onClick={() => setShowForm(false)}
-                className="rounded-xl bg-slate-700/60 px-3 py-2 text-slate-300 hover:bg-slate-700"
-              >
-                Close
-              </button>
+      <AdminModal
+        open={showForm}
+        title={editing ? 'Edit sub-admin' : 'Create sub-admin'}
+        onClose={() => setShowForm(false)}
+        wide
+        footer={
+          <>
+            <button
+              type="button"
+              className="admin-btn admin-btn-secondary"
+              onClick={() => setShowForm(false)}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="admin-btn admin-btn-primary"
+              disabled={saving}
+              onClick={saveSubAdmin}
+            >
+              {saving ? 'Saving…' : editing ? 'Update profile' : 'Create profile'}
+            </button>
+          </>
+        }
+      >
+        <div className="space-y-5">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <div>
+              <label className="admin-label">Full name *</label>
+              <input
+                value={form.name}
+                onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))}
+                className="admin-input"
+                placeholder="Sub-admin name"
+              />
             </div>
-
-            <div className="mt-8 grid grid-cols-1 gap-5 md:grid-cols-2">
-              <div>
-                <label className="mb-2 block text-sm font-medium text-slate-300">Full Name *</label>
-                <input
-                  value={form.name}
-                  onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))}
-                  className="w-full rounded-xl border border-slate-700/60 bg-slate-900/50 px-4 py-3 text-slate-100 outline-none focus:ring-2 focus:ring-emerald-500/40"
-                  placeholder="Sub-admin name"
-                />
-              </div>
-              <div>
-                <label className="mb-2 block text-sm font-medium text-slate-300">Email *</label>
-                <input
-                  type="email"
-                  value={form.email}
-                  onChange={(e) => setForm((prev) => ({ ...prev, email: e.target.value }))}
-                  className="w-full rounded-xl border border-slate-700/60 bg-slate-900/50 px-4 py-3 text-slate-100 outline-none focus:ring-2 focus:ring-emerald-500/40"
-                  placeholder="staff@mystatus.com"
-                />
-              </div>
-              <div>
-                <label className="mb-2 block text-sm font-medium text-slate-300">
-                  Password {editing ? '(leave blank to keep same)' : '*'}
-                </label>
-                <input
-                  type="password"
-                  value={form.password}
-                  onChange={(e) => setForm((prev) => ({ ...prev, password: e.target.value }))}
-                  className="w-full rounded-xl border border-slate-700/60 bg-slate-900/50 px-4 py-3 text-slate-100 outline-none focus:ring-2 focus:ring-emerald-500/40"
-                  placeholder="Minimum 6 characters"
-                />
-              </div>
-              <div>
-                <label className="mb-2 block text-sm font-medium text-slate-300">Phone</label>
-                <input
-                  value={form.phone}
-                  onChange={(e) => setForm((prev) => ({ ...prev, phone: e.target.value }))}
-                  className="w-full rounded-xl border border-slate-700/60 bg-slate-900/50 px-4 py-3 text-slate-100 outline-none focus:ring-2 focus:ring-emerald-500/40"
-                  placeholder="Optional phone number"
-                />
-              </div>
-              <div className="md:col-span-2">
-                <label className="mb-2 block text-sm font-medium text-slate-300">Profile Image URL</label>
-                <input
-                  type="url"
-                  value={form.profileImage}
-                  onChange={(e) => setForm((prev) => ({ ...prev, profileImage: e.target.value }))}
-                  className="w-full rounded-xl border border-slate-700/60 bg-slate-900/50 px-4 py-3 text-slate-100 outline-none focus:ring-2 focus:ring-emerald-500/40"
-                  placeholder="https://example.com/profile.jpg"
-                />
-              </div>
+            <div>
+              <label className="admin-label">Email *</label>
+              <input
+                type="email"
+                value={form.email}
+                onChange={(e) => setForm((prev) => ({ ...prev, email: e.target.value }))}
+                className="admin-input"
+                placeholder="staff@mystatus.com"
+              />
             </div>
-
-            <div className="mt-8">
-              <h3 className="text-lg font-bold text-slate-100">Restrictions / Allowed Forms</h3>
-              <p className="mt-1 text-sm text-slate-400">
-                Checked items are allowed. Unchecked sections are hidden and blocked by API permissions.
-              </p>
-
-              <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
-                {ADMIN_PERMISSIONS.map((permission) => (
-                  <label
-                    key={permission}
-                    className={`cursor-pointer rounded-2xl border p-5 transition ${
-                      form.permissions.includes(permission)
-                        ? 'border-emerald-500/50 bg-emerald-500/15'
-                        : 'border-slate-700/60 bg-slate-900/40 hover:border-slate-600'
-                    }`}
-                  >
-                    <div className="flex items-start gap-3">
-                      <input
-                        type="checkbox"
-                        checked={form.permissions.includes(permission)}
-                        onChange={() => togglePermission(permission)}
-                        className="mt-1 h-4 w-4 rounded border-slate-600 text-emerald-500"
-                      />
-                      <div>
-                        <p className="font-semibold text-slate-100">{ADMIN_PERMISSION_LABELS[permission]}</p>
-                        <p className="mt-1 text-sm text-slate-400">{ADMIN_PERMISSION_DESCRIPTIONS[permission]}</p>
-                      </div>
-                    </div>
-                  </label>
-                ))}
-              </div>
-            </div>
-
-            {editing && (
-              <label className="mt-6 flex items-center gap-3 text-slate-200">
-                <input
-                  type="checkbox"
-                  checked={form.isActive}
-                  onChange={(e) => setForm((prev) => ({ ...prev, isActive: e.target.checked }))}
-                  className="h-4 w-4 rounded border-slate-600 text-emerald-500"
-                />
-                Active login
+            <div>
+              <label className="admin-label">
+                Password {editing ? '(leave blank to keep)' : '*'}
               </label>
-            )}
-
-            <div className="mt-8 flex flex-col gap-3 border-t border-slate-700/60 pt-6 sm:flex-row sm:justify-end">
-              <button
-                onClick={() => setShowForm(false)}
-                className="rounded-xl border border-slate-700 bg-slate-800 px-6 py-3 font-semibold text-slate-200 hover:bg-slate-700"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={saveSubAdmin}
-                disabled={saving}
-                className="rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 px-6 py-3 font-semibold text-white shadow-lg shadow-emerald-500/20 disabled:opacity-50"
-              >
-                {saving ? 'Saving...' : editing ? 'Update Profile' : 'Create Profile'}
-              </button>
+              <input
+                type="password"
+                value={form.password}
+                onChange={(e) => setForm((prev) => ({ ...prev, password: e.target.value }))}
+                className="admin-input"
+                placeholder="Minimum 6 characters"
+              />
+            </div>
+            <div>
+              <label className="admin-label">Phone</label>
+              <input
+                value={form.phone}
+                onChange={(e) => setForm((prev) => ({ ...prev, phone: e.target.value }))}
+                className="admin-input"
+                placeholder="Optional"
+              />
+            </div>
+            <div className="md:col-span-2">
+              <label className="admin-label">Profile image URL</label>
+              <input
+                type="url"
+                value={form.profileImage}
+                onChange={(e) => setForm((prev) => ({ ...prev, profileImage: e.target.value }))}
+                className="admin-input"
+                placeholder="https://example.com/profile.jpg"
+              />
             </div>
           </div>
+
+          <div>
+            <h3 className="admin-display text-base font-semibold">Allowed forms</h3>
+            <p className="mt-1 text-sm text-[var(--admin-muted)]">
+              Checked items are allowed. Unchecked sections are hidden and blocked by the API.
+            </p>
+            <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
+              {ADMIN_PERMISSIONS.map((permission) => (
+                <label
+                  key={permission}
+                  className={`cursor-pointer rounded-[var(--admin-radius)] border p-4 transition ${
+                    form.permissions.includes(permission)
+                      ? 'border-emerald-500/40 bg-emerald-500/10'
+                      : 'border-[var(--admin-border)] bg-[var(--admin-bg)]/40'
+                  }`}
+                >
+                  <div className="flex items-start gap-3">
+                    <input
+                      type="checkbox"
+                      checked={form.permissions.includes(permission)}
+                      onChange={() => togglePermission(permission)}
+                      className="mt-1"
+                    />
+                    <div>
+                      <p className="font-semibold text-sm">{ADMIN_PERMISSION_LABELS[permission]}</p>
+                      <p className="mt-1 text-xs text-[var(--admin-muted)]">
+                        {ADMIN_PERMISSION_DESCRIPTIONS[permission]}
+                      </p>
+                    </div>
+                  </div>
+                </label>
+              ))}
+            </div>
+          </div>
+
+          {editing ? (
+            <label className="flex items-center gap-3 text-sm">
+              <input
+                type="checkbox"
+                checked={form.isActive}
+                onChange={(e) => setForm((prev) => ({ ...prev, isActive: e.target.checked }))}
+              />
+              Active login
+            </label>
+          ) : null}
         </div>
-      )}
+      </AdminModal>
     </div>
   );
 }

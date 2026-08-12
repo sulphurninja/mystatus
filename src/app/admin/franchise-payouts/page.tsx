@@ -1,9 +1,15 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Input } from '@/components/ui/input';
+import { TrendingUp } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, RefreshCw, Play } from 'lucide-react';
+import { useAdminPagination } from '@/hooks/useAdminPagination';
+import PageHeader from '@/components/admin/PageHeader';
+import StatStrip from '@/components/admin/StatStrip';
+import FilterBar from '@/components/admin/FilterBar';
+import DataTable, { DataTableColumn } from '@/components/admin/DataTable';
+import Pagination from '@/components/admin/Pagination';
+import StatusPill from '@/components/admin/StatusPill';
 
 type PayoutRun = {
   _id: string;
@@ -24,62 +30,115 @@ type DailyPayout = {
   franchiseKey?: { key: string; price: number };
 };
 
+function runTone(status: string): 'success' | 'warning' | 'danger' | 'neutral' | 'info' {
+  const s = status.toLowerCase();
+  if (s === 'completed') return 'success';
+  if (s === 'running' || s === 'pending') return 'warning';
+  if (s === 'failed') return 'danger';
+  return 'neutral';
+}
+
 export default function FranchisePayoutsPage() {
   const { toast } = useToast();
   const [runs, setRuns] = useState<PayoutRun[]>([]);
   const [payouts, setPayouts] = useState<DailyPayout[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loadingRuns, setLoadingRuns] = useState(true);
+  const [loadingPayouts, setLoadingPayouts] = useState(true);
   const [running, setRunning] = useState(false);
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const runsPager = useAdminPagination(20);
+  const payoutsPager = useAdminPagination(20);
 
   const formatInr = (value: unknown) => {
     const n = typeof value === 'number' ? value : Number(value);
     return (Number.isFinite(n) ? n : 0).toFixed(2);
   };
 
-  useEffect(() => {
-    checkAuth();
-    loadData();
-  }, []);
-
-  const checkAuth = () => {
-    const token = localStorage.getItem('adminToken');
-    if (!token) {
-      window.location.href = '/admin/login';
-    }
-  };
-
-  const getAuthHeaders = () => {
+  const getAuthHeaders = (): Record<string, string> => {
     const token = typeof window !== 'undefined' ? localStorage.getItem('adminToken') : null;
     return token ? { Authorization: `Bearer ${token}` } : {};
   };
 
-  const loadData = async () => {
+  useEffect(() => {
+    const token = localStorage.getItem('adminToken');
+    if (!token) {
+      window.location.href = '/admin/login';
+    }
+  }, []);
+
+  useEffect(() => {
+    loadRuns();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [date, runsPager.page, runsPager.limit]);
+
+  useEffect(() => {
+    loadPayouts();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [date, payoutsPager.page, payoutsPager.limit]);
+
+  const loadRuns = async () => {
     try {
-      setLoading(true);
-      const [runsRes, payoutsRes] = await Promise.all([
-        fetch(`/api/admin/franchise-payouts?date=${date}`, {
-          headers: { ...getAuthHeaders() }
-        }),
-        fetch(`/api/admin/franchise-payouts?date=${date}&payouts=true`, {
-          headers: { ...getAuthHeaders() }
-        })
-      ]);
-
-      const runsData = await runsRes.json();
-      const payoutsData = await payoutsRes.json();
-
-      setRuns(runsData.success ? runsData.data : []);
-      setPayouts(payoutsData.success ? payoutsData.data : []);
-    } catch (error) {
+      setLoadingRuns(true);
+      const params = new URLSearchParams({
+        date,
+        page: String(runsPager.page),
+        limit: String(runsPager.limit),
+      });
+      const res = await fetch(`/api/admin/franchise-payouts?${params.toString()}`, {
+        headers: { ...getAuthHeaders() },
+      });
+      const data = await res.json();
+      if (data.success) {
+        setRuns(data.data || []);
+        runsPager.setFromResponse(data.pagination || {});
+      } else {
+        setRuns([]);
+      }
+    } catch {
       toast({
         title: 'Error',
-        description: 'Failed to load payout data',
-        variant: 'destructive'
+        description: 'Failed to load payout runs',
+        variant: 'destructive',
       });
+      setRuns([]);
     } finally {
-      setLoading(false);
+      setLoadingRuns(false);
     }
+  };
+
+  const loadPayouts = async () => {
+    try {
+      setLoadingPayouts(true);
+      const params = new URLSearchParams({
+        date,
+        payouts: 'true',
+        page: String(payoutsPager.page),
+        limit: String(payoutsPager.limit),
+      });
+      const res = await fetch(`/api/admin/franchise-payouts?${params.toString()}`, {
+        headers: { ...getAuthHeaders() },
+      });
+      const data = await res.json();
+      if (data.success) {
+        setPayouts(data.data || []);
+        payoutsPager.setFromResponse(data.pagination || {});
+      } else {
+        setPayouts([]);
+      }
+    } catch {
+      toast({
+        title: 'Error',
+        description: 'Failed to load daily payouts',
+        variant: 'destructive',
+      });
+      setPayouts([]);
+    } finally {
+      setLoadingPayouts(false);
+    }
+  };
+
+  const refreshAll = async () => {
+    await Promise.all([loadRuns(), loadPayouts()]);
   };
 
   const runPayouts = async () => {
@@ -89,9 +148,9 @@ export default function FranchisePayoutsPage() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          ...getAuthHeaders()
+          ...getAuthHeaders(),
         },
-        body: JSON.stringify({ date })
+        body: JSON.stringify({ date }),
       });
       const data = await res.json();
       if (!res.ok || !data.success) {
@@ -99,134 +158,189 @@ export default function FranchisePayoutsPage() {
       }
       toast({
         title: 'Success',
-        description: 'Franchise payouts processed'
+        description: 'Franchise payouts processed',
       });
-      await loadData();
+      runsPager.setPage(1);
+      payoutsPager.setPage(1);
+      await refreshAll();
     } catch (error: any) {
       toast({
         title: 'Error',
         description: error.message || 'Failed to run payouts',
-        variant: 'destructive'
+        variant: 'destructive',
       });
     } finally {
       setRunning(false);
     }
   };
 
-  const totalPaid = payouts.reduce((sum, payout) => sum + (payout.amount || 0), 0);
-  const totalRecipients = payouts.length;
-  const completedRuns = runs.filter(run => run.status === 'completed').length;
+  const pagePaid = payouts.reduce((sum, payout) => sum + (payout.amount || 0), 0);
+  const completedOnPage = runs.filter((run) => run.status === 'completed').length;
 
-  if (loading) {
-    return (
-      <div className="p-6 lg:p-8 space-y-8">
-        <div className="flex items-center justify-center h-64">
-          <Loader2 className="h-8 w-8 animate-spin text-amber-400" />
+  const runColumns: DataTableColumn<PayoutRun>[] = [
+    {
+      key: 'date',
+      header: 'Payout Date',
+      render: (run) => (
+        <span className="font-medium tabular-nums">
+          {new Date(run.payoutDate).toISOString().slice(0, 10)}
+        </span>
+      ),
+    },
+    {
+      key: 'status',
+      header: 'Status',
+      render: (run) => <StatusPill tone={runTone(run.status)}>{run.status}</StatusPill>,
+    },
+    {
+      key: 'paid',
+      header: 'Total Paid',
+      render: (run) => (
+        <span className="tabular-nums text-emerald-300">INR {formatInr(run.totalPaid)}</span>
+      ),
+    },
+    {
+      key: 'recipients',
+      header: 'Recipients',
+      render: (run) => <span className="tabular-nums">{run.totalRecipients || 0}</span>,
+    },
+  ];
+
+  const payoutColumns: DataTableColumn<DailyPayout>[] = [
+    {
+      key: 'recipient',
+      header: 'Recipient',
+      render: (payout) => (
+        <div>
+          <p className="font-medium">{payout.paidTo?.name || 'User'}</p>
+          <p className="text-xs text-[var(--admin-muted)]">Level {payout.level}</p>
         </div>
-      </div>
-    );
-  }
+      ),
+    },
+    {
+      key: 'amount',
+      header: 'Amount',
+      render: (payout) => (
+        <span className="font-semibold tabular-nums text-emerald-300">
+          INR {formatInr(payout.amount)}
+        </span>
+      ),
+    },
+    {
+      key: 'referred',
+      header: 'Referred User',
+      render: (payout) => (
+        <span className="text-sm text-[var(--admin-muted)]">
+          {payout.referredUser?.name || 'N/A'}
+        </span>
+      ),
+    },
+    {
+      key: 'key',
+      header: 'Franchise Key',
+      render: (payout) => (
+        <code className="text-xs text-[var(--admin-muted)]">
+          {payout.franchiseKey?.key || 'N/A'}
+        </code>
+      ),
+    },
+  ];
 
   return (
     <div className="p-6 lg:p-8 space-y-8">
-      <div className="space-y-2">
-        <div className="flex items-center space-x-3">
-          <div className="w-1 h-8 bg-gradient-to-b from-amber-400 to-orange-500 rounded-full" />
-          <h1 className="text-4xl font-bold bg-gradient-to-r from-slate-100 to-slate-300 bg-clip-text text-transparent">
-            Franchise Payouts
-          </h1>
-        </div>
-        <p className="text-slate-400 text-lg font-medium">
-          Run daily recurring payouts and review payout history
-        </p>
+      <PageHeader
+        icon={TrendingUp}
+        title="Franchise Payouts"
+        description="Run daily recurring payouts and review payout history."
+        actions={
+          <>
+            <button type="button" className="admin-btn admin-btn-secondary" onClick={refreshAll}>
+              Refresh
+            </button>
+            <button
+              type="button"
+              className="admin-btn admin-btn-primary"
+              disabled={running}
+              onClick={runPayouts}
+            >
+              {running ? 'Running…' : 'Run Payouts'}
+            </button>
+          </>
+        }
+      />
+
+      <div className="admin-panel p-4">
+        <FilterBar>
+          <div className="flex flex-wrap items-center gap-3">
+            <label className="admin-label !mb-0" htmlFor="payoutDate">
+              Payout date
+            </label>
+            <input
+              id="payoutDate"
+              type="date"
+              value={date}
+              onChange={(e) => {
+                setDate(e.target.value);
+                runsPager.setPage(1);
+                payoutsPager.setPage(1);
+              }}
+              className="admin-input !w-auto"
+            />
+          </div>
+        </FilterBar>
       </div>
 
-      <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-6 flex flex-col md:flex-row md:items-center gap-4">
-        <div className="flex items-center gap-3">
-          <label className="text-sm text-slate-400">Payout Date</label>
-          <Input
-            type="date"
-            value={date}
-            onChange={(e) => setDate(e.target.value)}
-            className="bg-slate-800/60 border-slate-700/50 text-slate-100"
-          />
-        </div>
-        <div className="flex gap-3 md:ml-auto">
-          <button
-            onClick={loadData}
-            className="px-4 py-2 rounded-xl border border-slate-700 text-slate-200 flex items-center gap-2"
-          >
-            <RefreshCw className="h-4 w-4" />
-            Refresh
-          </button>
-          <button
-            onClick={runPayouts}
-            disabled={running}
-            className="px-4 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-orange-600 text-white font-semibold flex items-center gap-2 disabled:opacity-60"
-          >
-            {running ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
-            Run Payouts
-          </button>
-        </div>
+      <StatStrip
+        items={[
+          { label: 'Paid (page)', value: `INR ${formatInr(pagePaid)}` },
+          { label: 'Payout rows', value: payoutsPager.total },
+          { label: 'Runs', value: runsPager.total },
+          { label: 'Completed (page)', value: completedOnPage },
+        ]}
+      />
+
+      <div className="space-y-3">
+        <h2 className="admin-display text-lg font-semibold text-[var(--admin-text)]">Payout Runs</h2>
+        <DataTable
+          columns={runColumns}
+          rows={runs}
+          rowKey={(row) => row._id}
+          loading={loadingRuns}
+          emptyTitle="No payout runs"
+          emptyDescription="No runs recorded for this date."
+          footer={
+            <Pagination
+              page={runsPager.page}
+              totalPages={runsPager.totalPages}
+              total={runsPager.total}
+              limit={runsPager.limit}
+              onPageChange={runsPager.setPage}
+              onLimitChange={runsPager.setLimit}
+            />
+          }
+        />
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-4">
-          <p className="text-xs text-slate-400 mb-1">Total Paid</p>
-          <p className="text-2xl font-bold text-amber-400">INR {formatInr(totalPaid)}</p>
-        </div>
-        <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-4">
-          <p className="text-xs text-slate-400 mb-1">Recipients</p>
-          <p className="text-2xl font-bold text-slate-100">{totalRecipients}</p>
-        </div>
-        <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-4">
-          <p className="text-xs text-slate-400 mb-1">Completed Runs</p>
-          <p className="text-2xl font-bold text-slate-100">{completedRuns}</p>
-        </div>
-      </div>
-
-      <div className="bg-slate-900/60 border border-slate-800 rounded-2xl overflow-hidden">
-        <div className="px-6 py-4 border-b border-slate-800 text-slate-300 font-semibold">Payout Runs</div>
-        <div className="divide-y divide-slate-800">
-          {runs.length === 0 ? (
-            <div className="p-6 text-slate-500">No payout runs recorded.</div>
-          ) : (
-            runs.map((run) => (
-              <div key={run._id} className="px-6 py-4 flex flex-col md:flex-row md:items-center md:justify-between gap-2">
-                <div>
-                  <div className="text-slate-200 font-semibold">{new Date(run.payoutDate).toISOString().slice(0, 10)}</div>
-                  <div className="text-xs text-slate-500">Status: {run.status}</div>
-                </div>
-                <div className="text-sm text-slate-400">
-                  Paid INR {formatInr(run.totalPaid)} to {run.totalRecipients || 0} recipients
-                </div>
-              </div>
-            ))
-          )}
-        </div>
-      </div>
-
-      <div className="bg-slate-900/60 border border-slate-800 rounded-2xl overflow-hidden">
-        <div className="px-6 py-4 border-b border-slate-800 text-slate-300 font-semibold">Daily Payouts</div>
-        <div className="divide-y divide-slate-800">
-          {payouts.length === 0 ? (
-            <div className="p-6 text-slate-500">No payouts found for this date.</div>
-          ) : (
-            payouts.map((payout) => (
-              <div key={payout._id} className="px-6 py-4 flex flex-col gap-1">
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-200 font-semibold">
-                    {payout.paidTo?.name || 'User'} · Level {payout.level}
-                  </span>
-                  <span className="text-amber-300 font-semibold">INR {formatInr(payout.amount)}</span>
-                </div>
-                <div className="text-xs text-slate-500">
-                  Referred user: {payout.referredUser?.name || 'N/A'} · Key: {payout.franchiseKey?.key || 'N/A'}
-                </div>
-              </div>
-            ))
-          )}
-        </div>
+      <div className="space-y-3">
+        <h2 className="admin-display text-lg font-semibold text-[var(--admin-text)]">Daily Payouts</h2>
+        <DataTable
+          columns={payoutColumns}
+          rows={payouts}
+          rowKey={(row) => row._id}
+          loading={loadingPayouts}
+          emptyTitle="No daily payouts"
+          emptyDescription="No payouts found for this date."
+          footer={
+            <Pagination
+              page={payoutsPager.page}
+              totalPages={payoutsPager.totalPages}
+              total={payoutsPager.total}
+              limit={payoutsPager.limit}
+              onPageChange={payoutsPager.setPage}
+              onLimitChange={payoutsPager.setLimit}
+            />
+          }
+        />
       </div>
     </div>
   );

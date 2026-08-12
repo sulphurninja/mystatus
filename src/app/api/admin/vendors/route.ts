@@ -5,7 +5,13 @@ import { authorizeAdminRequest } from '@/middleware/auth';
 
 export async function GET(request: NextRequest) {
   try {
-    const auth = await authorizeAdminRequest(request, ['vendors.create', 'vendors.approve']);
+    // Ads admins need the vendor list to attach advertisements
+    const auth = await authorizeAdminRequest(request, [
+      'vendors.create',
+      'vendors.approve',
+      'advertisements.create',
+      'advertisements.approve'
+    ]);
     if (auth.error) {
       return NextResponse.json(
         { success: false, message: auth.error.message },
@@ -15,9 +21,25 @@ export async function GET(request: NextRequest) {
 
     await connectToDatabase();
 
-    const vendors = await Vendor.find()
-      .select('-password') // Exclude password field
-      .sort({ createdAt: -1 });
+    const { searchParams } = new URL(request.url);
+    const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(searchParams.get('limit') || '20', 10) || 20));
+    const skip = (page - 1) * limit;
+    const search = (searchParams.get('search') || '').trim();
+
+    const query: Record<string, unknown> = {};
+    if (search) {
+      query.$or = [
+        { name: { $regex: search, $options: 'i' } },
+        { email: { $regex: search, $options: 'i' } },
+        { businessName: { $regex: search, $options: 'i' } },
+      ];
+    }
+
+    const [vendors, total] = await Promise.all([
+      Vendor.find(query).select('-password').sort({ createdAt: -1 }).skip(skip).limit(limit),
+      Vendor.countDocuments(query),
+    ]);
 
     return NextResponse.json({
       success: true,
@@ -35,7 +57,14 @@ export async function GET(request: NextRequest) {
         status: (vendor as any).status || (vendor.isActive ? 'active' : 'pending'),
         isActive: vendor.isActive,
         createdAt: vendor.createdAt
-      }))
+      })),
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.max(1, Math.ceil(total / limit) || 1),
+        pages: Math.max(1, Math.ceil(total / limit) || 1),
+      }
     });
 
   } catch (error: any) {

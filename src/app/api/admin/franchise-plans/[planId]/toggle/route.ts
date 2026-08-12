@@ -4,7 +4,10 @@ import FranchisePayoutPlan from '@/models/FranchisePayoutPlan';
 import { authenticateRequest } from '@/middleware/auth';
 
 // PATCH /api/admin/franchise-plans/[planId]/toggle - Toggle payout plan active status
-export async function PATCH(request: NextRequest, { params }: { params: { planId: string } }) {
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ planId: string }> }
+) {
   try {
     const auth = authenticateRequest(request, ['admin']);
     if (auth.error) {
@@ -16,7 +19,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { planId
 
     await connectToDatabase();
 
-    const { planId } = params;
+    const { planId } = await params;
     if (!planId) {
       return NextResponse.json(
         { success: false, message: 'Plan ID is required' },

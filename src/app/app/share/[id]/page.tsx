@@ -1,11 +1,12 @@
 'use client';
 
-import { useState, useEffect, use } from 'react';
+import { useState, useEffect, useRef, use } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import AppHeader from '@/components/app/AppHeader';
 import CoinAmount from '@/components/app/CoinAmount';
+import AdMedia from '@/components/app/AdMedia';
 import {
   Upload,
   Image as ImageIcon,
@@ -23,6 +24,7 @@ interface Ad {
   title: string;
   description: string;
   imageUrl: string;
+  mediaType?: 'image' | 'video';
   reward: number;
   verificationPeriod: string;
   vendor?: { name: string };
@@ -36,6 +38,41 @@ const slugify = (value: string) =>
     .normalize('NFKD')
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/(^-|-$)/g, '');
+
+const isIOSDevice = () => {
+  if (typeof navigator === 'undefined') return false;
+  const ua = navigator.userAgent || '';
+  const iOS = /iPad|iPhone|iPod/.test(ua);
+  const iPadOS = navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1;
+  return iOS || iPadOS;
+};
+
+const isAndroidDevice = () =>
+  typeof navigator !== 'undefined' && /Android/i.test(navigator.userAgent || '');
+
+const normalizeShareMime = (raw: string | undefined, mediaType: 'image' | 'video') => {
+  const base = (raw || '').split(';')[0].trim().toLowerCase();
+  if (base.startsWith('image/') || base.startsWith('video/')) return base;
+  return mediaType === 'video' ? 'video/mp4' : 'image/jpeg';
+};
+
+const buildShareFile = (
+  blob: Blob,
+  filename: string,
+  mediaType: 'image' | 'video',
+  headerMime?: string | null
+) => {
+  const mime = normalizeShareMime(headerMime || blob.type, mediaType);
+  // Android Chrome is picky about File.name extension matching the MIME
+  let name = filename || (mediaType === 'video' ? 'mystatus-ad.mp4' : 'mystatus-ad.jpg');
+  if (mime === 'image/jpeg' && !/\.jpe?g$/i.test(name)) name = name.replace(/\.[^.]+$/, '') + '.jpg';
+  if (mime === 'image/png' && !/\.png$/i.test(name)) name = name.replace(/\.[^.]+$/, '') + '.png';
+  if (mime === 'image/webp' && !/\.webp$/i.test(name)) name = name.replace(/\.[^.]+$/, '') + '.webp';
+  if (mime.startsWith('video/') && !/\.(mp4|webm|mov|3gp)$/i.test(name)) {
+    name = name.replace(/\.[^.]+$/, '') + (mime.includes('webm') ? '.webm' : '.mp4');
+  }
+  return new File([blob], name, { type: mime });
+};
 
 export default function ShareAdPage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = use(params);
@@ -52,6 +89,11 @@ export default function ShareAdPage({ params }: { params: Promise<{ id: string }
   const [fileType, setFileType] = useState<'image' | 'video'>('image');
   const [shareUrl, setShareUrl] = useState('');
   const [isCopied, setIsCopied] = useState(false);
+  const [isSharing, setIsSharing] = useState(false);
+  const [isPreparingShare, setIsPreparingShare] = useState(false);
+  const [shareReady, setShareReady] = useState(false);
+  // Ref keeps the File available synchronously on tap (setState before share kills Android user-activation)
+  const cachedShareFileRef = useRef<File | null>(null);
 
   useEffect(() => {
     fetchAdAndCreateShare();
@@ -62,8 +104,50 @@ export default function ShareAdPage({ params }: { params: Promise<{ id: string }
     const baseUrl = window.location.origin;
     const slug = slugify(ad.title) || ad._id;
     const referral = user?.referralCode ? `?ref=${encodeURIComponent(user.referralCode)}` : '';
+    // Keep property/referral link for lead gen; status share uses the media file itself
     setShareUrl(`${baseUrl}/property/${encodeURIComponent(slug)}${referral}`);
   }, [ad, user?.referralCode]);
+
+  // Prefetch ad media so tap can call navigator.share without awaiting a network fetch
+  useEffect(() => {
+    let cancelled = false;
+    const prepare = async () => {
+      cachedShareFileRef.current = null;
+      setShareReady(false);
+      if (!ad?.imageUrl || !token) return;
+
+      setIsPreparingShare(true);
+      try {
+        const proxyUrl = `/api/media-proxy?url=${encodeURIComponent(ad.imageUrl)}`;
+        const response = await fetch(proxyUrl, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!response.ok) throw new Error('prepare failed');
+        const blob = await response.blob();
+        const mediaType =
+          (response.headers.get('X-Media-Type') as 'image' | 'video') || ad.mediaType || 'image';
+        const filename =
+          response.headers.get('X-Filename') ||
+          (mediaType === 'video' ? `mystatus-ad-${ad._id}.mp4` : `mystatus-ad-${ad._id}.jpg`);
+        const file = buildShareFile(blob, filename, mediaType, response.headers.get('Content-Type'));
+        if (!cancelled) {
+          cachedShareFileRef.current = file;
+          setShareReady(true);
+        }
+      } catch {
+        if (!cancelled) {
+          cachedShareFileRef.current = null;
+          setShareReady(false);
+        }
+      } finally {
+        if (!cancelled) setIsPreparingShare(false);
+      }
+    };
+    prepare();
+    return () => {
+      cancelled = true;
+    };
+  }, [ad?._id, ad?.imageUrl, ad?.mediaType, token]);
 
   const fetchAdAndCreateShare = async () => {
     try {
@@ -80,6 +164,7 @@ export default function ShareAdPage({ params }: { params: Promise<{ id: string }
           title: adData.title,
           description: adData.description,
           imageUrl: adData.image || adData.imageUrl,
+          mediaType: adData.mediaType === 'video' ? 'video' : 'image',
           reward: adData.rewardAmount || adData.reward,
           verificationPeriod: adData.verificationPeriodHours ? `${adData.verificationPeriodHours}h` : (adData.verificationPeriod || 'instant'),
           vendor: adData.vendor,
@@ -205,26 +290,153 @@ export default function ShareAdPage({ params }: { params: Promise<{ id: string }
     }
   };
 
+  const fetchAdMediaFile = async (): Promise<File> => {
+    if (!ad?.imageUrl || !token) {
+      throw new Error('Ad media is not ready');
+    }
+
+    const proxyUrl = `/api/media-proxy?url=${encodeURIComponent(ad.imageUrl)}`;
+    const response = await fetch(proxyUrl, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    if (!response.ok) {
+      throw new Error('Could not download ad media for sharing');
+    }
+
+    const blob = await response.blob();
+    const mediaType =
+      (response.headers.get('X-Media-Type') as 'image' | 'video') || ad.mediaType || 'image';
+    const filename =
+      response.headers.get('X-Filename') ||
+      (mediaType === 'video' ? `mystatus-ad-${ad._id}.mp4` : `mystatus-ad-${ad._id}.jpg`);
+
+    return buildShareFile(blob, filename, mediaType, response.headers.get('Content-Type'));
+  };
+
+  const tryNativeShare = async (file: File) => {
+    if (typeof navigator === 'undefined' || typeof navigator.share !== 'function') {
+      return false;
+    }
+
+    // Mobile browsers often reject files + text together. Files-only opens the sheet reliably.
+    // Desktop / Android can then try a richer payload if files-only somehow fails first.
+    const payloads: ShareData[] = [
+      { files: [file] },
+      ...(isIOSDevice()
+        ? []
+        : [
+            {
+              files: [file],
+              title: ad?.title || 'MyStatus Ad',
+              text: [ad?.title, shareUrl ? `Register: ${shareUrl}` : ''].filter(Boolean).join('\n'),
+            } as ShareData,
+          ]),
+    ];
+
+    for (const payload of payloads) {
+      try {
+        // Skip canShare gate — Chrome Android sometimes returns false incorrectly for valid files
+        await navigator.share(payload);
+        return true;
+      } catch (error: any) {
+        if (error?.name === 'AbortError') return true;
+        // Try next payload
+      }
+    }
+
+    return false;
+  };
+
+  const downloadShareFile = (file: File) => {
+    const objectUrl = URL.createObjectURL(file);
+    const anchor = document.createElement('a');
+    anchor.href = objectUrl;
+    anchor.download = file.name;
+    document.body.appendChild(anchor);
+    anchor.click();
+    document.body.removeChild(anchor);
+    URL.revokeObjectURL(objectUrl);
+  };
+
   const handleShareToWhatsApp = async () => {
+    if (!ad?._id || !ad.imageUrl) {
+      toast({ title: 'Error', description: 'Ad media is not ready yet. Please try again.', variant: 'destructive' });
+      return;
+    }
+
+    if (typeof window !== 'undefined' && !window.isSecureContext) {
+      toast({
+        title: 'HTTPS required',
+        description: 'Phone browsers only open the share sheet on HTTPS (or localhost). Open the live site, not a plain http:// LAN URL.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    // Critical: call navigator.share in the same tick as the tap, before any setState.
+    // Android Chrome drops user-activation after a React re-render.
+    let file = cachedShareFileRef.current;
+    if (file && typeof navigator !== 'undefined' && typeof navigator.share === 'function') {
+      try {
+        await navigator.share({ files: [file] });
+        toast({
+          title: 'Choose WhatsApp Status',
+          description: 'In the share sheet, tap WhatsApp / Status to post this ad.',
+        });
+        return;
+      } catch (error: any) {
+        if (error?.name === 'AbortError') return;
+        // Fall through to retry helpers below
+      }
+    }
+
+    setIsSharing(true);
     try {
-      if (!shareUrl || !ad?._id) {
-        toast({ title: 'Error', description: 'Share link is not ready yet. Please try again.', variant: 'destructive' });
+      if (!file) {
+        file = await fetchAdMediaFile();
+        cachedShareFileRef.current = file;
+        setShareReady(true);
+      }
+
+      const shared = await tryNativeShare(file);
+      if (shared) {
+        toast({
+          title: 'Choose WhatsApp Status',
+          description: isIOSDevice()
+            ? 'In the share sheet tap WhatsApp (or Status). If you only see Save Image, open WhatsApp → Status → Gallery and pick this ad.'
+            : 'In the share sheet, choose WhatsApp / Status to post this ad media.',
+        });
         return;
       }
-      const baseUrl = window.location.origin;
-      const adLink = `${baseUrl}/app/share/${encodeURIComponent(ad._id)}`;
-      const registerLink = shareUrl;
-      const messageLines = [
-        `Check out ${ad.title}`,
-        `Ad Link -> ${adLink}`,
-        `Register Link -> ${registerLink}`,
-      ];
-      const message = messageLines.join('\n');
-      const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(message)}`;
-      window.open(whatsappUrl, '_blank', 'noopener,noreferrer');
-    } catch (error) {
+
+      // Only download when Web Share API is missing (old browsers) — not when share just failed
+      if (typeof navigator === 'undefined' || typeof navigator.share !== 'function') {
+        downloadShareFile(file);
+        toast({
+          title: 'Media downloaded',
+          description: 'Open WhatsApp → Status → add the downloaded image/video.',
+        });
+        return;
+      }
+
+      toast({
+        title: 'Could not open share sheet',
+        description: isAndroidDevice()
+          ? 'Tap Share again. Use Chrome (not in-app browsers). Media must finish preparing first.'
+          : 'Tap Share again after the media finishes preparing. Use Safari on iPhone.',
+        variant: 'destructive',
+      });
+    } catch (error: any) {
+      if (error?.name === 'AbortError') return;
       console.error('Share error:', error);
-      toast({ title: 'Error', description: 'Could not open WhatsApp. Please try again.', variant: 'destructive' });
+      toast({
+        title: 'Share failed',
+        description: error?.message || 'Could not share ad media. Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSharing(false);
     }
   };
 
@@ -386,9 +598,10 @@ export default function ShareAdPage({ params }: { params: Promise<{ id: string }
         <div className="glass-card rounded-2xl overflow-hidden mb-6">
           {ad.imageUrl && (
             <div className="h-48 bg-slate-950">
-              <img
+              <AdMedia
                 src={ad.imageUrl}
                 alt={ad.title}
+                mediaType={ad.mediaType}
                 className="w-full h-full object-cover"
               />
             </div>
@@ -433,16 +646,28 @@ export default function ShareAdPage({ params }: { params: Promise<{ id: string }
         {!share?.proofImage && (
           <div className="mb-6">
             <button
+              type="button"
               onClick={handleShareToWhatsApp}
-              className="w-full py-4 bg-gradient-to-r from-emerald-500 via-emerald-600 to-green-600 text-white font-bold rounded-xl flex items-center justify-center gap-3 hover:shadow-lg hover:shadow-emerald-500/30 transition-all"
+              disabled={isSharing || isPreparingShare}
+              className="w-full py-4 bg-gradient-to-r from-emerald-500 via-emerald-600 to-green-600 text-white font-bold rounded-xl flex items-center justify-center gap-3 hover:shadow-lg hover:shadow-emerald-500/30 transition-all disabled:opacity-60"
             >
-              <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/>
-              </svg>
-              Share Link to WhatsApp
+              {isSharing || isPreparingShare ? (
+                <Loader2 className="w-5 h-5 animate-spin" />
+              ) : (
+                <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/>
+                </svg>
+              )}
+              {isPreparingShare
+                ? 'Preparing media…'
+                : isSharing
+                  ? 'Opening share…'
+                  : shareReady
+                    ? 'Share Media to WhatsApp Status'
+                    : 'Tap to prepare & share'}
             </button>
             <p className="text-xs text-slate-400 text-center mt-3">
-              Share the link on WhatsApp, then upload proof below
+              Wait until preparing finishes, then tap Share — pick WhatsApp / Status from the sheet. Use Chrome on Android or Safari on iPhone (not Instagram/WhatsApp in-app browsers).
             </p>
           </div>
         )}
@@ -486,11 +711,11 @@ export default function ShareAdPage({ params }: { params: Promise<{ id: string }
               <div className="space-y-2 text-sm text-slate-400">
                 <p className="flex gap-2">
                   <span className="text-emerald-400 font-bold">1.</span>
-                  Copy the share link and post it on WhatsApp
+                  Tap “Share Media to WhatsApp Status” and pick WhatsApp Status
                 </p>
                 <p className="flex gap-2">
                   <span className="text-emerald-400 font-bold">2.</span>
-                  Take a screenshot of the shared link as proof
+                  Take a screenshot of your status as proof
                 </p>
                 <p className="flex gap-2">
                   <span className="text-emerald-400 font-bold">3.</span>

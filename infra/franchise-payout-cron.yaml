@@ -1,0 +1,61 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Daily franchise payout cron (Lambda + EventBridge) for EC2-hosted MyStatus app
+
+Parameters:
+  AppBaseUrl:
+    Type: String
+    Default: https://mystatusads.com
+    Description: Public base URL of the Next.js app on EC2 (e.g. https://mystatusads.com)
+  FranchisePayoutCronSecret:
+    Type: String
+    NoEcho: true
+    Description: Shared secret; must match FRANCHISE_PAYOUT_CRON_SECRET on the EC2 app
+  ScheduleExpression:
+    Type: String
+    Default: cron(0 1 * * ? *)
+    Description: EventBridge schedule (default 01:00 UTC daily)
+  FunctionName:
+    Type: String
+    Default: mystatus-franchise-payout-cron
+
+Globals:
+  Function:
+    Runtime: nodejs20.x
+    Timeout: 120
+    MemorySize: 256
+    Architectures:
+      - x86_64
+
+Resources:
+  FranchisePayoutCronFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Ref FunctionName
+      Description: Calls EC2 /api/cron/franchise-payouts once per day
+      CodeUri: ../lambda/franchise-payout-cron/
+      Handler: index.handler
+      Environment:
+        Variables:
+          APP_BASE_URL: !Ref AppBaseUrl
+          FRANCHISE_PAYOUT_CRON_SECRET: !Ref FranchisePayoutCronSecret
+          REQUEST_TIMEOUT_MS: '110000'
+      Events:
+        DailySchedule:
+          Type: Schedule
+          Properties:
+            Schedule: !Ref ScheduleExpression
+            Description: Trigger franchise daily payouts
+            Enabled: true
+            Name: !Sub '${FunctionName}-schedule'
+
+Outputs:
+  FunctionName:
+    Description: Lambda function name
+    Value: !Ref FranchisePayoutCronFunction
+  FunctionArn:
+    Description: Lambda function ARN
+    Value: !GetAtt FranchisePayoutCronFunction.Arn
+  Schedule:
+    Description: EventBridge schedule expression
+    Value: !Ref ScheduleExpression

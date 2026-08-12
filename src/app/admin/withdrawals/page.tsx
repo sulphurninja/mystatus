@@ -1,7 +1,16 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { Banknote } from 'lucide-react';
 import { calculateWithdrawalCharges } from '@/lib/withdrawalCharges';
+import { useAdminPagination } from '@/hooks/useAdminPagination';
+import PageHeader from '@/components/admin/PageHeader';
+import StatStrip from '@/components/admin/StatStrip';
+import FilterBar from '@/components/admin/FilterBar';
+import DataTable, { DataTableColumn } from '@/components/admin/DataTable';
+import Pagination from '@/components/admin/Pagination';
+import AdminModal from '@/components/admin/AdminModal';
+import StatusPill from '@/components/admin/StatusPill';
 
 interface WithdrawalRequest {
   id: string;
@@ -39,6 +48,13 @@ interface Stats {
   rejected: number;
 }
 
+function statusTone(status: string): 'warning' | 'success' | 'danger' | 'neutral' {
+  if (status === 'pending') return 'warning';
+  if (status === 'approved') return 'success';
+  if (status === 'rejected') return 'danger';
+  return 'neutral';
+}
+
 export default function WithdrawalsPage() {
   const [requests, setRequests] = useState<WithdrawalRequest[]>([]);
   const [stats, setStats] = useState<Stats>({ pending: 0, approved: 0, rejected: 0 });
@@ -48,28 +64,41 @@ export default function WithdrawalsPage() {
   const [rejectionReason, setRejectionReason] = useState('');
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [selectedRequest, setSelectedRequest] = useState<WithdrawalRequest | null>(null);
+  const pagination = useAdminPagination(20);
 
   useEffect(() => {
     fetchWithdrawalRequests();
-  }, [filter]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filter, pagination.page, pagination.limit]);
+
+  const getAuthHeaders = (): Record<string, string> => {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('adminToken') : null;
+    return token ? { Authorization: `Bearer ${token}` } : {};
+  };
 
   const fetchWithdrawalRequests = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem('adminToken');
-      const response = await fetch(`/api/admin/withdrawals?status=${filter}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
+      const params = new URLSearchParams({
+        status: filter,
+        page: String(pagination.page),
+        limit: String(pagination.limit),
+      });
+      const response = await fetch(`/api/admin/withdrawals?${params.toString()}`, {
+        headers: getAuthHeaders(),
       });
       const data = await response.json();
-      
+
       if (data.success) {
-        setRequests(data.data.requests);
-        setStats(data.data.stats);
+        setRequests(data.data.requests || []);
+        setStats(data.data.stats || { pending: 0, approved: 0, rejected: 0 });
+        pagination.setFromResponse(data.data.pagination || {});
+      } else {
+        setRequests([]);
       }
     } catch (error) {
       console.error('Error fetching withdrawal requests:', error);
+      setRequests([]);
     } finally {
       setLoading(false);
     }
@@ -78,17 +107,16 @@ export default function WithdrawalsPage() {
   const processRequest = async (requestId: string, action: 'approve' | 'reject', reason?: string) => {
     try {
       setProcessingId(requestId);
-      const token = localStorage.getItem('adminToken');
       const response = await fetch(`/api/admin/withdrawals/${requestId}`, {
         method: 'PUT',
         headers: {
-          'Authorization': `Bearer ${token}`,
+          ...getAuthHeaders(),
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ action, rejectionReason: reason }),
       });
       const data = await response.json();
-      
+
       if (data.success) {
         fetchWithdrawalRequests();
         setShowRejectModal(false);
@@ -120,238 +148,221 @@ export default function WithdrawalsPage() {
     }
   };
 
-  const getStatusBadge = (status: string) => {
-    const colors: Record<string, string> = {
-      pending: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
-      approved: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
-      rejected: 'bg-red-500/20 text-red-400 border-red-500/30',
-    };
-    return colors[status] || 'bg-slate-500/20 text-slate-400 border-slate-500/30';
-  };
-
   const selectedNetAmount = selectedRequest
     ? (selectedRequest.netAmount ?? calculateWithdrawalCharges(selectedRequest.amount).netAmount)
     : 0;
 
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
-      <div className="p-6 lg:p-8">
-        {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-white mb-2">Withdrawal Requests</h1>
-          <p className="text-slate-400">Manage user withdrawal requests</p>
+  const columns: DataTableColumn<WithdrawalRequest>[] = [
+    {
+      key: 'user',
+      header: 'User',
+      render: (request) => (
+        <div>
+          <p className="font-medium">{request.user?.name || 'Unknown'}</p>
+          <p className="text-xs text-[var(--admin-muted)]">
+            {request.user?.phone || request.user?.email || '-'}
+          </p>
+          <p className="text-xs text-emerald-400">Code: {request.user?.referralCode}</p>
         </div>
-
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-          <div className="bg-slate-800/50 border border-yellow-500/20 rounded-xl p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-slate-400 text-sm">Pending</p>
-                <p className="text-3xl font-bold text-yellow-400">{stats.pending}</p>
-              </div>
-              <div className="w-12 h-12 bg-yellow-500/20 rounded-xl flex items-center justify-center">
-                <svg className="w-6 h-6 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-slate-800/50 border border-emerald-500/20 rounded-xl p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-slate-400 text-sm">Approved</p>
-                <p className="text-3xl font-bold text-emerald-400">{stats.approved}</p>
-              </div>
-              <div className="w-12 h-12 bg-emerald-500/20 rounded-xl flex items-center justify-center">
-                <svg className="w-6 h-6 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                </svg>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-slate-800/50 border border-red-500/20 rounded-xl p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-slate-400 text-sm">Rejected</p>
-                <p className="text-3xl font-bold text-red-400">{stats.rejected}</p>
-              </div>
-              <div className="w-12 h-12 bg-red-500/20 rounded-xl flex items-center justify-center">
-                <svg className="w-6 h-6 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Filter Tabs */}
-        <div className="flex gap-2 mb-6">
-          {['pending', 'approved', 'rejected', 'all'].map((status) => (
-            <button
-              key={status}
-              onClick={() => setFilter(status)}
-              className={`px-4 py-2 rounded-lg font-medium transition-all ${
-                filter === status
-                  ? 'bg-emerald-500 text-white'
-                  : 'bg-slate-700/50 text-slate-400 hover:bg-slate-600/50'
-              }`}
-            >
-              {status.charAt(0).toUpperCase() + status.slice(1)}
-            </button>
-          ))}
-        </div>
-
-        {/* Requests Table */}
-        <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl overflow-hidden">
-          {loading ? (
-            <div className="flex items-center justify-center py-20">
-              <div className="w-8 h-8 border-2 border-emerald-500/30 border-t-emerald-500 rounded-full animate-spin" />
-            </div>
-          ) : requests.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-20">
-              <svg className="w-16 h-16 text-slate-600 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
-              <p className="text-slate-400">No withdrawal requests found</p>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-slate-700/50">
-                    <th className="text-left p-4 text-slate-400 font-medium">User</th>
-                    <th className="text-left p-4 text-slate-400 font-medium">Payable Amount</th>
-                    <th className="text-left p-4 text-slate-400 font-medium">Activation Key</th>
-                    <th className="text-left p-4 text-slate-400 font-medium">Payment Details</th>
-                    <th className="text-left p-4 text-slate-400 font-medium">Status</th>
-                    <th className="text-left p-4 text-slate-400 font-medium">Requested</th>
-                    <th className="text-left p-4 text-slate-400 font-medium">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {requests.map((request) => {
-                    const computed = calculateWithdrawalCharges(request.amount);
-                    const netAmount = request.netAmount ?? computed.netAmount;
-                    const totalDeduction = request.totalDeduction ?? computed.totalDeduction;
-                    const tdsRate = request.tdsRate ?? computed.tdsRate;
-                    const adminRate = request.adminRate ?? computed.adminRate;
-
-                    return (
-                    <tr key={request.id} className="border-b border-slate-700/30 hover:bg-slate-700/20">
-                      <td className="p-4">
-                        <div>
-                          <p className="text-white font-medium">{request.user?.name || 'Unknown'}</p>
-                          <p className="text-slate-400 text-sm">{request.user?.phone || request.user?.email || '-'}</p>
-                          <p className="text-emerald-400 text-xs">Code: {request.user?.referralCode}</p>
-                        </div>
-                      </td>
-                      <td className="p-4">
-                        <span className="text-white font-bold text-lg">{'\u20B9'}{netAmount.toFixed(2)}</span>
-                        <p className="text-slate-400 text-xs">
-                          Deduction: {'\u20B9'}{totalDeduction.toFixed(2)} ({Math.round(tdsRate * 100)}% + {Math.round(adminRate * 100)}%)
-                        </p>
-                        <p className="text-slate-400 text-xs">Balance: {'\u20B9'}{request.user?.walletBalance}</p>
-                      </td>
-                      <td className="p-4">
-                        <code className="bg-slate-700/50 px-2 py-1 rounded text-emerald-400 text-sm">
-                          {request.activationKey}
-                        </code>
-                      </td>
-                      <td className="p-4">
-                        {request.paymentDetails?.upiId ? (
-                          <span className="text-slate-300 text-sm">{request.paymentDetails.upiId}</span>
-                        ) : (
-                          <span className="text-slate-500 text-sm">Not provided</span>
-                        )}
-                      </td>
-                      <td className="p-4">
-                        <span className={`px-3 py-1 rounded-full text-xs font-medium border ${getStatusBadge(request.status)}`}>
-                          {request.status.charAt(0).toUpperCase() + request.status.slice(1)}
-                        </span>
-                        {request.rejectionReason && (
-                          <p className="text-red-400 text-xs mt-1">{request.rejectionReason}</p>
-                        )}
-                      </td>
-                      <td className="p-4">
-                        <span className="text-slate-400 text-sm">
-                          {new Date(request.requestedAt).toLocaleDateString()}
-                        </span>
-                      </td>
-                      <td className="p-4">
-                        {request.status === 'pending' && (
-                          <div className="flex gap-2">
-                            <button
-                              onClick={() => processRequest(request.id, 'approve')}
-                              disabled={processingId === request.id}
-                              className="px-3 py-1.5 bg-emerald-500/20 text-emerald-400 rounded-lg hover:bg-emerald-500/30 transition-colors text-sm font-medium disabled:opacity-50"
-                            >
-                              {processingId === request.id ? 'Processing...' : 'Approve'}
-                            </button>
-                            <button
-                              onClick={() => handleReject(request)}
-                              disabled={processingId === request.id}
-                              className="px-3 py-1.5 bg-red-500/20 text-red-400 rounded-lg hover:bg-red-500/30 transition-colors text-sm font-medium disabled:opacity-50"
-                            >
-                              Reject
-                            </button>
-                          </div>
-                        )}
-                        {request.status !== 'pending' && (
-                          <span className="text-slate-500 text-sm">
-                            {request.processedAt && new Date(request.processedAt).toLocaleDateString()}
-                          </span>
-                        )}
-                      </td>
-                    </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Rejection Modal */}
-      {showRejectModal && (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-          <div className="bg-slate-800 rounded-xl max-w-md w-full p-6 border border-slate-700">
-            <h3 className="text-xl font-bold text-white mb-4">Reject Withdrawal Request</h3>
-            <p className="text-slate-400 mb-4">
-              Rejecting withdrawal request of <span className="text-emerald-400 font-bold">{'\u20B9'}{selectedNetAmount.toFixed(2)}</span> from <span className="text-white">{selectedRequest?.user?.name}</span>
+      ),
+    },
+    {
+      key: 'amount',
+      header: 'Payable Amount',
+      render: (request) => {
+        const computed = calculateWithdrawalCharges(request.amount);
+        const netAmount = request.netAmount ?? computed.netAmount;
+        const totalDeduction = request.totalDeduction ?? computed.totalDeduction;
+        const tdsRate = request.tdsRate ?? computed.tdsRate;
+        const adminRate = request.adminRate ?? computed.adminRate;
+        return (
+          <div>
+            <p className="font-semibold tabular-nums">₹{netAmount.toFixed(2)}</p>
+            <p className="text-xs text-[var(--admin-muted)]">
+              Deduction: ₹{totalDeduction.toFixed(2)} ({Math.round(tdsRate * 100)}% +{' '}
+              {Math.round(adminRate * 100)}%)
             </p>
-            <textarea
-              value={rejectionReason}
-              onChange={(e) => setRejectionReason(e.target.value)}
-              placeholder="Enter rejection reason..."
-              className="w-full bg-slate-700/50 border border-slate-600 rounded-lg p-3 text-white placeholder-slate-400 focus:outline-none focus:border-emerald-500 resize-none"
-              rows={3}
-            />
-            <div className="flex gap-3 mt-4">
-              <button
-                onClick={() => {
-                  setShowRejectModal(false);
-                  setRejectionReason('');
-                  setSelectedRequest(null);
-                }}
-                className="flex-1 px-4 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={confirmReject}
-                disabled={processingId !== null}
-                className="flex-1 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors disabled:opacity-50"
-              >
-                {processingId ? 'Processing...' : 'Reject'}
-              </button>
-            </div>
+            <p className="text-xs text-[var(--admin-muted)]">
+              Balance: ₹{request.user?.walletBalance}
+            </p>
           </div>
+        );
+      },
+    },
+    {
+      key: 'key',
+      header: 'Activation Key',
+      render: (request) => (
+        <code className="rounded-md border border-[var(--admin-border)] bg-[var(--admin-panel-elevated)] px-2 py-1 text-xs text-emerald-300">
+          {request.activationKey}
+        </code>
+      ),
+    },
+    {
+      key: 'payment',
+      header: 'Payment Details',
+      render: (request) =>
+        request.paymentDetails?.upiId ? (
+          <span className="text-sm">{request.paymentDetails.upiId}</span>
+        ) : (
+          <span className="text-sm text-[var(--admin-faint)]">Not provided</span>
+        ),
+    },
+    {
+      key: 'status',
+      header: 'Status',
+      render: (request) => (
+        <div>
+          <StatusPill tone={statusTone(request.status)}>{request.status}</StatusPill>
+          {request.rejectionReason ? (
+            <p className="mt-1 text-xs text-red-300">{request.rejectionReason}</p>
+          ) : null}
         </div>
-      )}
+      ),
+    },
+    {
+      key: 'requested',
+      header: 'Requested',
+      render: (request) => (
+        <span className="text-sm text-[var(--admin-muted)] tabular-nums">
+          {new Date(request.requestedAt).toLocaleDateString()}
+        </span>
+      ),
+    },
+    {
+      key: 'actions',
+      header: 'Actions',
+      render: (request) =>
+        request.status === 'pending' ? (
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => processRequest(request.id, 'approve')}
+              disabled={processingId === request.id}
+              className="admin-btn admin-btn-primary !py-1.5 !px-3"
+            >
+              {processingId === request.id ? '…' : 'Approve'}
+            </button>
+            <button
+              type="button"
+              onClick={() => handleReject(request)}
+              disabled={processingId === request.id}
+              className="admin-btn admin-btn-danger !py-1.5 !px-3"
+            >
+              Reject
+            </button>
+          </div>
+        ) : (
+          <span className="text-sm text-[var(--admin-faint)]">
+            {request.processedAt ? new Date(request.processedAt).toLocaleDateString() : '—'}
+          </span>
+        ),
+    },
+  ];
+
+  return (
+    <div className="p-6 lg:p-8">
+      <PageHeader
+        icon={Banknote}
+        title="Withdrawal Requests"
+        description="Review and process user withdrawal requests."
+      />
+
+      <StatStrip
+        items={[
+          { label: 'Pending', value: stats.pending },
+          { label: 'Approved', value: stats.approved },
+          { label: 'Rejected', value: stats.rejected },
+          { label: 'Showing', value: pagination.total },
+        ]}
+      />
+
+      <FilterBar>
+        {(['pending', 'approved', 'rejected', 'all'] as const).map((status) => (
+          <button
+            key={status}
+            type="button"
+            onClick={() => {
+              setFilter(status);
+              pagination.setPage(1);
+            }}
+            className={`admin-btn ${
+              filter === status ? 'admin-btn-primary' : 'admin-btn-secondary'
+            } !py-1.5 !px-3 capitalize`}
+          >
+            {status}
+          </button>
+        ))}
+      </FilterBar>
+
+      <DataTable
+        columns={columns}
+        rows={requests}
+        rowKey={(row) => row.id}
+        loading={loading}
+        emptyTitle="No withdrawal requests"
+        emptyDescription="Nothing matches this status filter."
+        footer={
+          <Pagination
+            page={pagination.page}
+            totalPages={pagination.totalPages}
+            total={pagination.total}
+            limit={pagination.limit}
+            onPageChange={pagination.setPage}
+            onLimitChange={pagination.setLimit}
+          />
+        }
+      />
+
+      <AdminModal
+        open={showRejectModal}
+        title="Reject Withdrawal Request"
+        onClose={() => {
+          setShowRejectModal(false);
+          setRejectionReason('');
+          setSelectedRequest(null);
+        }}
+        footer={
+          <>
+            <button
+              type="button"
+              className="admin-btn admin-btn-secondary"
+              onClick={() => {
+                setShowRejectModal(false);
+                setRejectionReason('');
+                setSelectedRequest(null);
+              }}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="admin-btn admin-btn-danger"
+              disabled={processingId !== null}
+              onClick={confirmReject}
+            >
+              {processingId ? 'Processing…' : 'Reject'}
+            </button>
+          </>
+        }
+      >
+        <p className="mb-4 text-sm text-[var(--admin-muted)]">
+          Rejecting withdrawal of{' '}
+          <span className="font-semibold text-emerald-300">₹{selectedNetAmount.toFixed(2)}</span>{' '}
+          from <span className="text-[var(--admin-text)]">{selectedRequest?.user?.name}</span>
+        </p>
+        <label className="admin-label" htmlFor="rejectionReason">
+          Rejection reason
+        </label>
+        <textarea
+          id="rejectionReason"
+          value={rejectionReason}
+          onChange={(e) => setRejectionReason(e.target.value)}
+          placeholder="Enter rejection reason…"
+          className="admin-input min-h-[96px] resize-none"
+          rows={3}
+        />
+      </AdminModal>
     </div>
   );
 }

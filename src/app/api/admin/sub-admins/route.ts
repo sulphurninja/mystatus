@@ -12,7 +12,15 @@ export async function GET(request: NextRequest) {
     }
 
     await connectToDatabase();
-    const subAdmins = await SubAdmin.find().select('-password').sort({ createdAt: -1 });
+    const { searchParams } = new URL(request.url);
+    const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(searchParams.get('limit') || '20', 10) || 20));
+    const skip = (page - 1) * limit;
+
+    const [subAdmins, total] = await Promise.all([
+      SubAdmin.find().select('-password').sort({ createdAt: -1 }).skip(skip).limit(limit),
+      SubAdmin.countDocuments(),
+    ]);
 
     return NextResponse.json({
       success: true,
@@ -27,6 +35,13 @@ export async function GET(request: NextRequest) {
         lastLoginAt: subAdmin.lastLoginAt,
         createdAt: subAdmin.createdAt,
       })),
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.max(1, Math.ceil(total / limit) || 1),
+        pages: Math.max(1, Math.ceil(total / limit) || 1),
+      },
     });
   } catch (error: any) {
     console.error('Get sub-admins error:', error);

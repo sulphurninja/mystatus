@@ -2,19 +2,40 @@ import { NextRequest, NextResponse } from 'next/server';
 import connectToDatabase from '@/lib/mongodb';
 import { runDailyFranchisePayouts } from '@/lib/franchisePayouts';
 
+/**
+ * Auth for AWS Lambda / EventBridge cron hitting this EC2-hosted app.
+ * Requires FRANCHISE_PAYOUT_CRON_SECRET and matching x-cron-secret / Bearer / ?secret=.
+ */
 async function authorizeCronRequest(request: NextRequest) {
   const secret = process.env.FRANCHISE_PAYOUT_CRON_SECRET;
-  const providedHeader = request.headers.get('x-cron-secret') || '';
-  const providedQuery = new URL(request.url).searchParams.get('secret') || '';
 
-  if (secret && providedHeader !== secret && providedQuery !== secret) {
+  if (!secret) {
+    console.error('FRANCHISE_PAYOUT_CRON_SECRET is not configured');
     return NextResponse.json(
-      { success: false, message: 'Unauthorized' },
-      { status: 401 }
+      { success: false, message: 'Cron secret not configured' },
+      { status: 503 }
     );
   }
 
-  return null;
+  const providedHeader = request.headers.get('x-cron-secret') || '';
+  const providedQuery = new URL(request.url).searchParams.get('secret') || '';
+  const authHeader = request.headers.get('authorization') || '';
+  const bearerToken = authHeader.toLowerCase().startsWith('bearer ')
+    ? authHeader.slice(7).trim()
+    : '';
+
+  if (
+    providedHeader === secret ||
+    providedQuery === secret ||
+    bearerToken === secret
+  ) {
+    return null;
+  }
+
+  return NextResponse.json(
+    { success: false, message: 'Unauthorized' },
+    { status: 401 }
+  );
 }
 
 async function handleCronRequest(request: NextRequest, body?: { date?: string; limit?: number }) {
@@ -45,7 +66,7 @@ async function handleCronRequest(request: NextRequest, body?: { date?: string; l
   }
 }
 
-// GET /api/cron/franchise-payouts - Trigger daily payouts from a scheduler
+// GET /api/cron/franchise-payouts - Trigger from schedulers that only support GET
 export async function GET(request: NextRequest) {
   const url = new URL(request.url);
   const date = url.searchParams.get('date') || undefined;
@@ -58,7 +79,7 @@ export async function GET(request: NextRequest) {
   });
 }
 
-// POST /api/cron/franchise-payouts - Trigger daily payouts manually or from cron
+// POST /api/cron/franchise-payouts - Preferred entrypoint (AWS Lambda)
 export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => ({}));
   return handleCronRequest(request, body);

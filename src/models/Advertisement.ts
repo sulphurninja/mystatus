@@ -3,7 +3,9 @@ import mongoose, { Document, Schema } from 'mongoose';
 export interface IAdvertisement extends Document {
   title: string;
   description: string;
+  /** Media URL (image or video). Field name kept as `image` for compatibility. */
   image: string;
+  mediaType: 'image' | 'video';
   rewardAmount: number;
   vendor: mongoose.Types.ObjectId;
   isActive: boolean;
@@ -32,7 +34,12 @@ const AdvertisementSchema: Schema = new Schema({
   },
   image: {
     type: String,
-    required: [true, 'Image is required']
+    required: [true, 'Media is required']
+  },
+  mediaType: {
+    type: String,
+    enum: ['image', 'video'],
+    default: 'image'
   },
   rewardAmount: {
     type: Number,

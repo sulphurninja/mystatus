@@ -5,6 +5,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import AppHeader from '@/components/app/AppHeader';
 import AdCard from '@/components/app/AdCard';
 import CoinAmount from '@/components/app/CoinAmount';
+import AdMedia from '@/components/app/AdMedia';
 import { Search, X } from 'lucide-react';
 import Link from 'next/link';
 
@@ -47,6 +48,7 @@ export default function DiscoverPage() {
         title: ad.title,
         description: ad.description,
         imageUrl: ad.image,
+        mediaType: ad.mediaType === 'video' ? 'video' : 'image',
         reward: ad.rewardAmount,
         verificationPeriod: ad.verificationPeriodHours === 0 ? 'instant' : `hour${ad.verificationPeriodHours}`,
         vendor: { name: ad.vendor?.businessName || ad.vendor?.name || 'Unknown' },
@@ -210,9 +212,10 @@ export default function DiscoverPage() {
               {/* Image */}
               {selectedAd.imageUrl && (
                 <div className="h-52 bg-slate-950">
-                  <img
+                  <AdMedia
                     src={selectedAd.imageUrl}
                     alt={selectedAd.title}
+                    mediaType={selectedAd.mediaType}
                     className="w-full h-full object-cover"
                   />
                 </div>

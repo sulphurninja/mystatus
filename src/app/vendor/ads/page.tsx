@@ -143,7 +143,11 @@ export default function VendorAdsPage() {
           {ads.map((ad) => (
             <div key={ad._id} className="bg-gradient-to-br from-slate-800/50 to-slate-900/50 backdrop-blur-xl rounded-2xl border border-slate-700/50 overflow-hidden hover:border-slate-600/50 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl">
               <div className="relative">
-                <img src={ad.image} alt={ad.title} className="w-full h-48 object-cover" />
+                {/\.(mp4|webm|mov|m4v)(\?|$)/i.test(ad.image) || ad.image?.includes('/video/upload/') || ad.mediaType === 'video' ? (
+                  <video src={ad.image} className="w-full h-48 object-cover" muted playsInline preload="metadata" />
+                ) : (
+                  <img src={ad.image} alt={ad.title} className="w-full h-48 object-cover" />
+                )}
                 <div className="absolute top-3 right-3">
                   <span className={`px-3 py-1 rounded-full text-xs font-semibold backdrop-blur-sm ${
                     ad.isActive

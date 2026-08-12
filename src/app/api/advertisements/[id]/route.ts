@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import connectToDatabase from '@/lib/mongodb';
 import Advertisement from '@/models/Advertisement';
 import { authenticateRequest } from '@/middleware/auth';
+import { detectAdMediaType } from '@/lib/adMedia';
 
 export async function GET(
   request: NextRequest,
@@ -54,6 +55,7 @@ export async function GET(
         description: advertisement.description,
         image: advertisement.image,
         imageUrl: advertisement.image,
+        mediaType: detectAdMediaType(advertisement.image, (advertisement as any).mediaType),
         rewardAmount: advertisement.rewardAmount,
         reward: advertisement.rewardAmount,
         verificationPeriodHours: advertisement.verificationPeriodHours,

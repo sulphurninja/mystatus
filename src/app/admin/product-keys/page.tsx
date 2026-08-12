@@ -1,10 +1,15 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
-import { useToast } from '@/hooks/use-toast';
-import { Loader2, Save, RefreshCw, Plus, Trash2 } from 'lucide-react';
+import { useState, useEffect, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
+import { BadgePercent } from 'lucide-react';
+import PageHeader from '@/components/admin/PageHeader';
+import StatStrip from '@/components/admin/StatStrip';
+import DataTable, { DataTableColumn } from '@/components/admin/DataTable';
+import Pagination from '@/components/admin/Pagination';
+import AdminModal from '@/components/admin/AdminModal';
+import StatusPill from '@/components/admin/StatusPill';
+import { useAdminPagination, paginateArray } from '@/hooks/useAdminPagination';
 
 interface ProductKeyTier {
   _id?: string;
@@ -36,40 +41,37 @@ const emptyTier: ProductKeyTier = {
     level3: 0,
     level4: 0,
     level5: 0,
-    level6: 0
+    level6: 0,
   },
   recurringDirect: {
     amount: 0,
-    type: 'amount'
+    type: 'amount',
   },
-  isActive: true
+  isActive: true,
 };
 
-const selectClassName =
-  'border-input h-9 w-full min-w-0 rounded-md border bg-transparent px-3 py-1 text-base shadow-xs transition-[color,box-shadow] outline-none md:text-sm ' +
-  'dark:bg-input/30 focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] ' +
-  'disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50';
-
 export default function ProductKeysPage() {
+  const router = useRouter();
   const [tiers, setTiers] = useState<ProductKeyTier[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [initializing, setInitializing] = useState(false);
-  const { toast } = useToast();
+  const [message, setMessage] = useState('');
+  const [editIndex, setEditIndex] = useState<number | null>(null);
+  const [draft, setDraft] = useState<ProductKeyTier | null>(null);
+  const pagination = useAdminPagination(10);
 
   useEffect(() => {
-    checkAuth();
-    loadTiers();
-  }, []);
-
-  const checkAuth = () => {
     const token = localStorage.getItem('adminToken');
     if (!token) {
-      window.location.href = '/admin/login';
+      router.push('/admin/login');
+      return;
     }
-  };
+    loadTiers();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  const getAuthHeaders = () => {
+  const getAuthHeaders = (): Record<string, string> => {
     const token = typeof window !== 'undefined' ? localStorage.getItem('adminToken') : null;
     return token ? { Authorization: `Bearer ${token}` } : {};
   };
@@ -86,77 +88,58 @@ export default function ProductKeysPage() {
       const data = await response.json();
 
       if (data.success) {
-        setTiers(data.data);
+        setTiers(data.data || []);
       } else {
-        toast({
-          title: 'Error',
-          description: data.message || 'Failed to load product key tiers',
-          variant: 'destructive',
-        });
+        setMessage(data.message || 'Failed to load product key tiers');
       }
-    } catch (error) {
-      toast({
-        title: 'Error',
-        description: 'Failed to load product key tiers',
-        variant: 'destructive',
-      });
+    } catch {
+      setMessage('Failed to load product key tiers');
     } finally {
       setLoading(false);
     }
   };
 
-  const saveTiers = async () => {
-    for (const tier of tiers) {
+  const pageSlice = useMemo(
+    () => paginateArray(tiers, pagination.page, pagination.limit),
+    [tiers, pagination.page, pagination.limit]
+  );
+
+  const saveTiers = async (nextTiers: ProductKeyTier[]) => {
+    for (const tier of nextTiers) {
       if (!tier.name.trim()) {
-        toast({
-          title: 'Error',
-          description: 'All tiers must have a name',
-          variant: 'destructive',
-        });
-        return;
+        setMessage('All tiers must have a name');
+        return false;
       }
       if (tier.minPrice > tier.maxPrice) {
-        toast({
-          title: 'Error',
-          description: `Invalid price range for "${tier.name}"`,
-          variant: 'destructive',
-        });
-        return;
+        setMessage(`Invalid price range for "${tier.name}"`);
+        return false;
       }
     }
 
     try {
       setSaving(true);
+      setMessage('');
       const response = await fetch('/api/admin/product-keys', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           ...getAuthHeaders(),
         },
-        body: JSON.stringify(tiers),
+        body: JSON.stringify(nextTiers),
       });
 
       const data = await response.json();
 
       if (data.success) {
-        toast({
-          title: 'Success',
-          description: 'Product key tiers saved successfully',
-        });
-        loadTiers();
-      } else {
-        toast({
-          title: 'Error',
-          description: data.message || 'Failed to save product key tiers',
-          variant: 'destructive',
-        });
+        setMessage('Product key tiers saved successfully');
+        await loadTiers();
+        return true;
       }
-    } catch (error) {
-      toast({
-        title: 'Error',
-        description: 'Failed to save product key tiers',
-        variant: 'destructive',
-      });
+      setMessage(data.message || 'Failed to save product key tiers');
+      return false;
+    } catch {
+      setMessage('Failed to save product key tiers');
+      return false;
     } finally {
       setSaving(false);
     }
@@ -177,83 +160,65 @@ export default function ProductKeysPage() {
 
       if (data.success) {
         await loadTiers();
-        toast({
-          title: 'Success',
-          description: 'Default product key tiers initialized',
-        });
+        setMessage('Default product key tiers initialized');
       } else {
-        toast({
-          title: 'Error',
-          description: data.message || 'Failed to initialize tiers',
-          variant: 'destructive',
-        });
+        setMessage(data.message || 'Failed to initialize tiers');
       }
-    } catch (error) {
-      toast({
-        title: 'Error',
-        description: 'Failed to initialize tiers',
-        variant: 'destructive',
-      });
+    } catch {
+      setMessage('Failed to initialize tiers');
     } finally {
       setInitializing(false);
     }
   };
 
-  const addTier = () => {
+  const openAdd = () => {
     const lastTier = tiers[tiers.length - 1];
     const newMinPrice = lastTier ? lastTier.maxPrice + 1 : 0;
-
-    setTiers([...tiers, {
+    setEditIndex(null);
+    setDraft({
       ...emptyTier,
       name: `Tier ${tiers.length + 1}`,
       minPrice: newMinPrice,
-      maxPrice: newMinPrice + 10000
-    }]);
+      maxPrice: newMinPrice + 10000,
+    });
   };
 
-  const removeTier = (index: number) => {
-    setTiers(tiers.filter((_, i) => i !== index));
+  const openEdit = (absoluteIndex: number) => {
+    setEditIndex(absoluteIndex);
+    setDraft({ ...tiers[absoluteIndex], commissions: { ...tiers[absoluteIndex].commissions }, recurringDirect: { ...tiers[absoluteIndex].recurringDirect } });
   };
 
-  const updateTier = (index: number, field: string, value: any) => {
-    setTiers(tiers.map((tier, i) => {
-      if (i !== index) return tier;
-
-      if (field.startsWith('commissions.')) {
-        const level = field.split('.')[1];
-        return {
-          ...tier,
-          commissions: {
-            ...tier.commissions,
-            [level]: Math.max(0, value)
-          }
-        };
-      }
-
-      if (field.startsWith('recurringDirect.')) {
-        const key = field.split('.')[1] as 'amount' | 'type';
-        return {
-          ...tier,
-          recurringDirect: {
-            ...tier.recurringDirect,
-            [key]: key === 'amount' ? Math.max(0, value) : value
-          }
-        };
-      }
-
-      return { ...tier, [field]: value };
-    }));
+  const removeTier = async (absoluteIndex: number) => {
+    if (!confirm('Remove this tier?')) return;
+    const next = tiers.filter((_, i) => i !== absoluteIndex);
+    setTiers(next);
+    await saveTiers(next);
   };
 
-  const resetToDefaults = () => {
-    setTiers([
+  const persistDraft = async () => {
+    if (!draft) return;
+    const next = [...tiers];
+    if (editIndex === null) {
+      next.push(draft);
+    } else {
+      next[editIndex] = draft;
+    }
+    const ok = await saveTiers(next);
+    if (ok) {
+      setDraft(null);
+      setEditIndex(null);
+    }
+  };
+
+  const resetToDefaults = async () => {
+    const defaults: ProductKeyTier[] = [
       {
         name: 'Standard',
         minPrice: 0,
         maxPrice: 5000,
         commissions: { level1: 500, level2: 300, level3: 200, level4: 100, level5: 50, level6: 50 },
         recurringDirect: { amount: 0, type: 'amount' },
-        isActive: true
+        isActive: true,
       },
       {
         name: 'Premium',
@@ -261,7 +226,7 @@ export default function ProductKeysPage() {
         maxPrice: 15000,
         commissions: { level1: 1500, level2: 900, level3: 600, level4: 300, level5: 150, level6: 150 },
         recurringDirect: { amount: 0, type: 'amount' },
-        isActive: true
+        isActive: true,
       },
       {
         name: 'VIP',
@@ -269,189 +234,301 @@ export default function ProductKeysPage() {
         maxPrice: 50000,
         commissions: { level1: 5000, level2: 3000, level3: 2000, level4: 1000, level5: 500, level6: 500 },
         recurringDirect: { amount: 0, type: 'amount' },
-        isActive: true
-      }
-    ]);
+        isActive: true,
+      },
+    ];
+    setTiers(defaults);
+    await saveTiers(defaults);
   };
 
-  if (loading) {
-    return (
-      <div className="p-6 lg:p-8 space-y-8">
-        <div className="space-y-2">
-          <div className="flex items-center space-x-3">
-            <div className="w-1 h-8 bg-gradient-to-b from-emerald-400 to-teal-500 rounded-full" />
-            <h1 className="text-4xl font-bold bg-gradient-to-r from-slate-100 to-slate-300 bg-clip-text text-transparent">
-              Product Keys
-            </h1>
+  const updateDraft = (field: string, value: unknown) => {
+    if (!draft) return;
+    if (field.startsWith('commissions.')) {
+      const level = field.split('.')[1];
+      setDraft({
+        ...draft,
+        commissions: {
+          ...draft.commissions,
+          [level]: Math.max(0, value as number),
+        },
+      });
+      return;
+    }
+    if (field.startsWith('recurringDirect.')) {
+      const key = field.split('.')[1] as 'amount' | 'type';
+      setDraft({
+        ...draft,
+        recurringDirect: {
+          ...draft.recurringDirect,
+          [key]: key === 'amount' ? Math.max(0, value as number) : value,
+        },
+      });
+      return;
+    }
+    setDraft({ ...draft, [field]: value });
+  };
+
+  const columns: DataTableColumn<ProductKeyTier & { __index: number }>[] = [
+      {
+        key: 'name',
+        header: 'Tier',
+        render: (row) => (
+          <div>
+            <p className="font-semibold">{row.name}</p>
+            <StatusPill tone={row.isActive ? 'success' : 'neutral'}>
+              {row.isActive ? 'Active' : 'Inactive'}
+            </StatusPill>
           </div>
-          <p className="text-slate-400 text-lg font-medium">
-            Configure one-time and recurring commissions for product keys
-          </p>
-        </div>
-        <div className="flex items-center justify-center h-64">
-          <Loader2 className="h-8 w-8 animate-spin text-emerald-400" />
-        </div>
-      </div>
-    );
-  }
+        ),
+      },
+      {
+        key: 'range',
+        header: 'Price range',
+        render: (row) => (
+          <span className="tabular-nums">
+            ₹{row.minPrice} – ₹{row.maxPrice}
+          </span>
+        ),
+      },
+      {
+        key: 'total',
+        header: 'One-time total',
+        render: (row) => (
+          <span className="tabular-nums text-emerald-300">
+            ₹{Object.values(row.commissions).reduce((sum, v) => sum + v, 0)}
+          </span>
+        ),
+      },
+      {
+        key: 'recurring',
+        header: 'Recurring',
+        render: (row) => (
+          <span className="tabular-nums">
+            {row.recurringDirect.amount}
+            {row.recurringDirect.type === 'percent' ? '%' : ' INR'}
+          </span>
+        ),
+      },
+      {
+        key: 'actions',
+        header: 'Actions',
+        render: (row) => (
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              className="admin-btn admin-btn-secondary !py-1.5 !px-3"
+              onClick={() => openEdit(row.__index)}
+            >
+              Edit
+            </button>
+            <button
+              type="button"
+              className="admin-btn admin-btn-danger !py-1.5 !px-3"
+              onClick={() => removeTier(row.__index)}
+            >
+              Remove
+            </button>
+          </div>
+        ),
+      },
+    ];
+
+  const rows = pageSlice.items.map((tier, i) => ({
+    ...tier,
+    __index: pagination.offset + i,
+  }));
 
   return (
-    <div className="p-6 lg:p-8 space-y-8">
-      <div className="space-y-2">
-        <div className="flex items-center space-x-3">
-          <div className="w-1 h-8 bg-gradient-to-b from-emerald-400 to-teal-500 rounded-full" />
-          <h1 className="text-4xl font-bold bg-gradient-to-r from-slate-100 to-slate-300 bg-clip-text text-transparent">
-            Product Keys
-          </h1>
-        </div>
-        <p className="text-slate-400 text-lg font-medium">
-          Configure one-time (6 levels) and recurring (Direct) commissions
-        </p>
-      </div>
+    <div className="space-y-6">
+      <PageHeader
+        icon={BadgePercent}
+        title="Product keys"
+        description="Configure one-time (6 levels) and recurring direct commissions"
+        actions={
+          <div className="flex flex-wrap gap-2">
+            {tiers.length === 0 ? (
+              <button
+                type="button"
+                onClick={initializeTiers}
+                disabled={initializing}
+                className="admin-btn admin-btn-secondary"
+              >
+                {initializing ? 'Initializing…' : 'Initialize defaults'}
+              </button>
+            ) : null}
+            <button type="button" onClick={resetToDefaults} className="admin-btn admin-btn-ghost">
+              Reset defaults
+            </button>
+            <button type="button" onClick={openAdd} className="admin-btn admin-btn-primary">
+              Add tier
+            </button>
+          </div>
+        }
+      />
 
-      <div className="flex flex-wrap gap-3 justify-end">
-        {tiers.length === 0 && (
-          <button
-            onClick={initializeTiers}
-            disabled={initializing}
-            className="px-5 py-3 rounded-2xl bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white font-semibold shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 transition-all duration-300 hover:-translate-y-0.5 disabled:opacity-60 disabled:cursor-not-allowed flex items-center gap-2"
-          >
-            {initializing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-            Initialize Default Tiers
+      {message ? <div className="admin-panel px-4 py-3 text-sm">{message}</div> : null}
+
+      <StatStrip
+        items={[
+          { label: 'Tiers', value: tiers.length },
+          { label: 'Active', value: tiers.filter((t) => t.isActive).length },
+          {
+            label: 'Price span',
+            value:
+              tiers.length > 0
+                ? `₹${Math.min(...tiers.map((t) => t.minPrice))}–₹${Math.max(...tiers.map((t) => t.maxPrice))}`
+                : '—',
+          },
+        ]}
+      />
+
+      <DataTable
+        columns={columns}
+        rows={rows}
+        rowKey={(r) => r._id || `${r.name}-${r.__index}`}
+        loading={loading}
+        emptyTitle="No product key tiers"
+        emptyDescription="Initialize defaults or add a tier to get started"
+        emptyAction={
+          <button type="button" onClick={openAdd} className="admin-btn admin-btn-primary">
+            Add tier
           </button>
-        )}
-        <button
-          onClick={addTier}
-          className="px-5 py-3 rounded-2xl border border-slate-700/50 bg-slate-800/50 text-slate-200 hover:bg-slate-700/50 transition-all duration-200 flex items-center gap-2"
-        >
-          <Plus className="h-4 w-4" />
-          Add Tier
-        </button>
-        <button
-          onClick={resetToDefaults}
-          className="px-5 py-3 rounded-2xl border border-slate-700/50 bg-slate-800/50 text-slate-200 hover:bg-slate-700/50 transition-all duration-200 flex items-center gap-2"
-        >
-          <RefreshCw className="h-4 w-4" />
-          Reset to Defaults
-        </button>
-        <button
-          onClick={saveTiers}
-          disabled={saving}
-          className="px-6 py-3 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-semibold shadow-lg shadow-emerald-500/25 hover:shadow-emerald-500/40 transition-all duration-300 hover:-translate-y-0.5 disabled:opacity-60 disabled:cursor-not-allowed flex items-center gap-2"
-        >
-          {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-          Save Changes
-        </button>
-      </div>
+        }
+        footer={
+          <Pagination
+            page={pageSlice.page}
+            totalPages={pageSlice.totalPages}
+            total={pageSlice.total}
+            limit={pagination.limit}
+            onPageChange={pagination.setPage}
+            onLimitChange={pagination.setLimit}
+            limitOptions={[5, 10, 20]}
+          />
+        }
+      />
 
-      {tiers.length === 0 ? (
-        <div className="bg-gradient-to-br from-slate-800/50 to-slate-900/50 backdrop-blur-xl rounded-2xl border border-slate-700/50 p-12 text-center">
-          <div className="text-slate-400 text-lg">No product key tiers configured</div>
-          <p className="text-slate-500 mt-2">Click "Initialize Default Tiers" or "Add Tier" to get started</p>
-        </div>
-      ) : (
-        <div className="space-y-6">
-          {tiers.map((tier, index) => (
-            <div key={index} className="bg-gradient-to-br from-slate-800/50 to-slate-900/50 backdrop-blur-xl rounded-2xl border border-slate-700/50 overflow-hidden">
-              <div className="px-6 py-4 border-b border-slate-700/50 flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <Input
-                    value={tier.name}
-                    onChange={(e) => updateTier(index, 'name', e.target.value)}
-                    className="bg-slate-800/60 border-slate-700/50 text-slate-100 font-semibold text-lg w-40"
-                    placeholder="Tier Name"
-                  />
-                  <Badge variant={tier.isActive ? 'default' : 'secondary'}>
-                    {tier.isActive ? 'Active' : 'Inactive'}
-                  </Badge>
-                </div>
-                <button
-                  onClick={() => removeTier(index)}
-                  className="p-2 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg transition-colors"
-                >
-                  <Trash2 className="h-5 w-5" />
-                </button>
+      <AdminModal
+        open={!!draft}
+        title={editIndex === null ? 'Add product key tier' : 'Edit product key tier'}
+        onClose={() => {
+          setDraft(null);
+          setEditIndex(null);
+        }}
+        wide
+        footer={
+          <>
+            <button
+              type="button"
+              className="admin-btn admin-btn-secondary"
+              onClick={() => {
+                setDraft(null);
+                setEditIndex(null);
+              }}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="admin-btn admin-btn-primary"
+              disabled={saving}
+              onClick={persistDraft}
+            >
+              {saving ? 'Saving…' : 'Save tier'}
+            </button>
+          </>
+        }
+      >
+        {draft ? (
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="admin-label">Name</label>
+                <input
+                  className="admin-input"
+                  value={draft.name}
+                  onChange={(e) => updateDraft('name', e.target.value)}
+                />
               </div>
-
-              <div className="p-6 space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-sm text-slate-400 mb-2 block">Min Key Price (INR)</label>
-                    <Input
-                      type="number"
-                      value={tier.minPrice}
-                      onChange={(e) => updateTier(index, 'minPrice', parseInt(e.target.value) || 0)}
-                      className="bg-slate-800/60 border-slate-700/50 text-slate-100"
-                      min="0"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-sm text-slate-400 mb-2 block">Max Key Price (INR)</label>
-                    <Input
-                      type="number"
-                      value={tier.maxPrice}
-                      onChange={(e) => updateTier(index, 'maxPrice', parseInt(e.target.value) || 0)}
-                      className="bg-slate-800/60 border-slate-700/50 text-slate-100"
-                      min="0"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="text-sm text-slate-400 mb-3 block">One-time Commission (6 Levels)</label>
-                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-                    {[1, 2, 3, 4, 5, 6].map((level) => (
-                      <div key={level} className="bg-slate-800/40 rounded-xl p-3">
-                        <div className="text-xs text-slate-500 mb-1">Level {level}</div>
-                        <Input
-                          type="number"
-                          value={tier.commissions[`level${level}` as keyof typeof tier.commissions]}
-                          onChange={(e) => updateTier(index, `commissions.level${level}`, parseInt(e.target.value) || 0)}
-                          className="bg-slate-700/50 border-slate-600/50 text-slate-100 text-center"
-                          min="0"
-                        />
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div>
-                  <label className="text-sm text-slate-400 mb-3 block">Recurring Commission (Direct / Level 1)</label>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <Input
-                        type="number"
-                        value={tier.recurringDirect.amount}
-                        onChange={(e) => updateTier(index, 'recurringDirect.amount', parseFloat(e.target.value) || 0)}
-                        className="bg-slate-800/60 border-slate-700/50 text-slate-100"
-                        min="0"
-                        placeholder="Recurring amount"
-                      />
-                    </div>
-                    <div>
-                      <select
-                        value={tier.recurringDirect.type}
-                        onChange={(e) => updateTier(index, 'recurringDirect.type', e.target.value as 'amount' | 'percent')}
-                        className={`${selectClassName} bg-slate-800/60 border-slate-700/50 text-slate-100`}
-                      >
-                        <option value="amount">Amount</option>
-                        <option value="percent">Percent</option>
-                      </select>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between bg-slate-800/40 rounded-xl p-4">
-                  <span className="text-slate-400">Total One-time Commission (All Levels)</span>
-                  <span className="text-2xl font-bold text-emerald-400">
-                    INR {Object.values(tier.commissions).reduce((sum, val) => sum + val, 0)}
-                  </span>
-                </div>
+              <label className="flex items-center gap-2 mt-6 text-sm">
+                <input
+                  type="checkbox"
+                  checked={draft.isActive}
+                  onChange={(e) => updateDraft('isActive', e.target.checked)}
+                />
+                Active
+              </label>
+              <div>
+                <label className="admin-label">Min price (INR)</label>
+                <input
+                  type="number"
+                  min={0}
+                  className="admin-input"
+                  value={draft.minPrice}
+                  onChange={(e) => updateDraft('minPrice', parseInt(e.target.value, 10) || 0)}
+                />
+              </div>
+              <div>
+                <label className="admin-label">Max price (INR)</label>
+                <input
+                  type="number"
+                  min={0}
+                  className="admin-input"
+                  value={draft.maxPrice}
+                  onChange={(e) => updateDraft('maxPrice', parseInt(e.target.value, 10) || 0)}
+                />
               </div>
             </div>
-          ))}
-        </div>
-      )}
+
+            <div>
+              <p className="admin-label">One-time commission (6 levels)</p>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                {[1, 2, 3, 4, 5, 6].map((level) => (
+                  <div key={level}>
+                    <label className="admin-label">Level {level}</label>
+                    <input
+                      type="number"
+                      min={0}
+                      className="admin-input"
+                      value={draft.commissions[`level${level}` as keyof typeof draft.commissions]}
+                      onChange={(e) =>
+                        updateDraft(`commissions.level${level}`, parseInt(e.target.value, 10) || 0)
+                      }
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="admin-label">Recurring amount</label>
+                <input
+                  type="number"
+                  min={0}
+                  className="admin-input"
+                  value={draft.recurringDirect.amount}
+                  onChange={(e) =>
+                    updateDraft('recurringDirect.amount', parseFloat(e.target.value) || 0)
+                  }
+                />
+              </div>
+              <div>
+                <label className="admin-label">Recurring type</label>
+                <select
+                  className="admin-input"
+                  value={draft.recurringDirect.type}
+                  onChange={(e) =>
+                    updateDraft('recurringDirect.type', e.target.value as 'amount' | 'percent')
+                  }
+                >
+                  <option value="amount">Amount</option>
+                  <option value="percent">Percent</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        ) : null}
+      </AdminModal>
     </div>
   );
 }

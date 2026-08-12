@@ -2,6 +2,14 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { KeyRound } from 'lucide-react';
+import PageHeader from '@/components/admin/PageHeader';
+import StatStrip from '@/components/admin/StatStrip';
+import DataTable, { DataTableColumn } from '@/components/admin/DataTable';
+import Pagination from '@/components/admin/Pagination';
+import AdminModal from '@/components/admin/AdminModal';
+import StatusPill from '@/components/admin/StatusPill';
+import { useAdminPagination } from '@/hooks/useAdminPagination';
 
 interface ActivationKey {
   _id: string;
@@ -35,36 +43,39 @@ export default function ActivationKeysPage() {
   const [keys, setKeys] = useState<ActivationKey[]>([]);
   const [loading, setLoading] = useState(true);
   const [showGenerateModal, setShowGenerateModal] = useState(false);
+  const [generating, setGenerating] = useState(false);
   const [generateCount, setGenerateCount] = useState(10);
   const [generatePrice, setGeneratePrice] = useState(2000);
   const [generateForSale, setGenerateForSale] = useState(true);
+  const pagination = useAdminPagination(25);
   const router = useRouter();
 
   useEffect(() => {
-    checkAuth();
-    loadActivationKeys();
-  }, []);
-
-  const checkAuth = () => {
     const token = localStorage.getItem('adminToken');
     if (!token) {
       router.push('/admin/login');
+      return;
     }
-  };
+  }, [router]);
 
-  const getAuthHeaders = () => {
+  useEffect(() => {
+    loadActivationKeys();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pagination.page, pagination.limit]);
+
+  const getAuthHeaders = (): Record<string, string> => {
     const token = typeof window !== 'undefined' ? localStorage.getItem('adminToken') : null;
-    return token
-      ? {
-          Authorization: `Bearer ${token}`,
-        }
-      : {};
+    return token ? { Authorization: `Bearer ${token}` } : {};
   };
 
   const loadActivationKeys = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/admin/activation-keys', {
+      const params = new URLSearchParams({
+        page: String(pagination.page),
+        limit: String(pagination.limit),
+      });
+      const response = await fetch(`/api/admin/activation-keys?${params}`, {
         headers: {
           'Content-Type': 'application/json',
           ...getAuthHeaders(),
@@ -73,6 +84,7 @@ export default function ActivationKeysPage() {
       if (response.ok) {
         const data = await response.json();
         setKeys(data.keys || []);
+        pagination.setFromResponse(data.pagination || {});
       } else {
         setKeys([]);
       }
@@ -86,6 +98,7 @@ export default function ActivationKeysPage() {
 
   const generateKeys = async () => {
     try {
+      setGenerating(true);
       const response = await fetch('/api/admin/activation-keys', {
         method: 'POST',
         headers: {
@@ -95,7 +108,7 @@ export default function ActivationKeysPage() {
         body: JSON.stringify({
           count: generateCount,
           price: generatePrice,
-          isForSale: generateForSale
+          isForSale: generateForSale,
         }),
       });
 
@@ -110,11 +123,10 @@ export default function ActivationKeysPage() {
       setGenerateForSale(true);
     } catch (error) {
       console.error('Error generating keys:', error);
+    } finally {
+      setGenerating(false);
     }
   };
-
-  const usedCount = keys.filter(key => key.isUsed).length;
-  const unusedCount = keys.filter(key => !key.isUsed).length;
 
   const toggleKeyForSale = async (keyId: string) => {
     try {
@@ -135,10 +147,11 @@ export default function ActivationKeysPage() {
   };
 
   const exportToCSV = () => {
-    const csvData = keys.map(key => ({
-      'Key': key.key,
-      'Status': key.isUsed ? 'Used' : key.isForSale ? 'For Sale' : 'Generated',
-      'Price': key.price,
+    if (!keys.length) return;
+    const csvData = keys.map((key) => ({
+      Key: key.key,
+      Status: key.isUsed ? 'Used' : key.isForSale ? 'For Sale' : 'Generated',
+      Price: key.price,
       'For Sale': key.isForSale ? 'Yes' : 'No',
       'Used By': key.usedBy ? key.usedBy.name : '',
       'User Email': key.usedBy?.email || '',
@@ -154,363 +167,248 @@ export default function ActivationKeysPage() {
 
     const csvString = [
       Object.keys(csvData[0]).join(','),
-      ...csvData.map(row => Object.values(row).map(value =>
-        typeof value === 'string' && value.includes(',') ? `"${value}"` : value
-      ).join(','))
+      ...csvData.map((row) =>
+        Object.values(row)
+          .map((value) => (typeof value === 'string' && value.includes(',') ? `"${value}"` : value))
+          .join(',')
+      ),
     ].join('\n');
 
     const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     const url = URL.createObjectURL(blob);
     link.setAttribute('href', url);
-    link.setAttribute('download', `activation_keys_export_${new Date().toISOString().split('T')[0]}.csv`);
+    link.setAttribute(
+      'download',
+      `activation_keys_export_${new Date().toISOString().split('T')[0]}.csv`
+    );
     link.style.visibility = 'hidden';
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
   };
 
-  return (
-    <div className="p-6 lg:p-8 space-y-8">
-      {/* Header */}
-      <div className="space-y-2">
-        <div className="flex items-center space-x-3">
-          <div className="w-1 h-8 bg-gradient-to-b from-emerald-400 to-teal-500 rounded-full"></div>
-          <h1 className="text-4xl font-bold bg-gradient-to-r from-slate-100 to-slate-300 bg-clip-text text-transparent">
-            Activation Keys
-          </h1>
-        </div>
-        <p className="text-slate-400 text-lg font-medium">
-          Generate and manage user activation keys
-        </p>
+  const person = (p?: { name: string; email?: string } | null) =>
+    p ? (
+      <div>
+        <p className="font-medium">{p.name}</p>
+        {p.email ? <p className="text-xs text-[var(--admin-muted)]">{p.email}</p> : null}
       </div>
+    ) : (
+      <span className="text-[var(--admin-faint)]">—</span>
+    );
 
-      {/* Stats Overview */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <div className="bg-gradient-to-br from-blue-500/20 to-indigo-600/20 backdrop-blur-xl rounded-2xl p-6 border border-blue-500/20">
-          <div className="flex items-center space-x-3">
-            <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center">
-              <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
-              </svg>
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-slate-100">{keys.length}</p>
-              <p className="text-slate-400 text-sm">Total Keys</p>
-            </div>
-          </div>
-        </div>
-        <div className="bg-gradient-to-br from-green-500/20 to-emerald-600/20 backdrop-blur-xl rounded-2xl p-6 border border-green-500/20">
-          <div className="flex items-center space-x-3">
-            <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl flex items-center justify-center">
-              <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-slate-100">{usedCount}</p>
-              <p className="text-slate-400 text-sm">Used Keys</p>
-            </div>
-          </div>
-        </div>
-        <div className="bg-gradient-to-br from-amber-500/20 to-orange-600/20 backdrop-blur-xl rounded-2xl p-6 border border-amber-500/20">
-          <div className="flex items-center space-x-3">
-            <div className="w-12 h-12 bg-gradient-to-br from-amber-500 to-orange-600 rounded-xl flex items-center justify-center">
-              <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-              </svg>
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-slate-100">{unusedCount}</p>
-              <p className="text-slate-400 text-sm">Available Keys</p>
-            </div>
-          </div>
-        </div>
-        <div className="bg-gradient-to-br from-purple-500/20 to-pink-600/20 backdrop-blur-xl rounded-2xl p-6 border border-purple-500/20">
-          <div className="flex items-center space-x-3">
-            <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-pink-600 rounded-xl flex items-center justify-center">
-              <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
-              </svg>
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-slate-100">
-                ₹{keys.filter(k => k.isForSale).reduce((sum, k) => sum + k.price, 0).toLocaleString()}
-              </p>
-              <p className="text-slate-400 text-sm">Market Value</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Action Buttons */}
-      <div className="flex justify-end gap-4">
-        <button
-          onClick={exportToCSV}
-          className="group relative bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white px-6 py-3 rounded-2xl font-semibold shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 transition-all duration-300 hover:-translate-y-0.5"
-        >
-          <div className="flex items-center space-x-2">
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-            </svg>
-            <span>Export CSV</span>
-          </div>
-        </button>
-        <button
-          onClick={() => setShowGenerateModal(true)}
-          className="group relative bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white px-6 py-3 rounded-2xl font-semibold shadow-lg shadow-emerald-500/25 hover:shadow-emerald-500/40 transition-all duration-300 hover:-translate-y-0.5"
-        >
-          <div className="flex items-center space-x-2">
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-            </svg>
-            <span>Generate New Keys</span>
-          </div>
-        </button>
-      </div>
-
-      {/* Keys Table */}
-      <div className="bg-gradient-to-br from-slate-800/50 to-slate-900/50 backdrop-blur-xl rounded-2xl border border-slate-700/50 overflow-hidden">
-        {loading ? (
-          <div className="p-6 space-y-3">
-            {[...Array(8)].map((_, i) => (
-              <div key={i} className="h-10 bg-slate-700/50 rounded-lg animate-pulse" />
-            ))}
-          </div>
-        ) : keys.length === 0 ? (
-          <div className="p-12 text-center">
-            <div className="w-16 h-16 bg-slate-700/60 rounded-2xl flex items-center justify-center mx-auto mb-4">
-              <svg className="w-8 h-8 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
-              </svg>
-            </div>
-            <h3 className="text-xl font-bold text-slate-100 mb-2">No Activation Keys</h3>
-            <p className="text-slate-400 mb-6">Generate your first activation keys to get started</p>
+  const columns: DataTableColumn<ActivationKey>[] = [
+      {
+        key: 'key',
+        header: 'Key',
+        render: (row) => (
+          <code className="text-xs font-mono break-all text-[var(--admin-muted)]">{row.key}</code>
+        ),
+      },
+      {
+        key: 'status',
+        header: 'Status',
+        render: (row) => (
+          <StatusPill
+            tone={row.isUsed ? 'success' : row.isForSale ? 'warning' : 'neutral'}
+          >
+            {row.isUsed ? 'Used' : row.isForSale ? 'For sale' : 'Generated'}
+          </StatusPill>
+        ),
+      },
+      {
+        key: 'price',
+        header: 'Price',
+        render: (row) => <span className="tabular-nums">₹{row.price}</span>,
+      },
+      {
+        key: 'sale',
+        header: 'For sale',
+        render: (row) => (row.isForSale ? 'Yes' : 'No'),
+      },
+      {
+        key: 'usedBy',
+        header: 'Used by',
+        render: (row) => person(row.usedBy),
+      },
+      {
+        key: 'purchasedBy',
+        header: 'Purchased by',
+        render: (row) => person(row.purchasedBy),
+      },
+      {
+        key: 'soldBy',
+        header: 'Sold by',
+        render: (row) => person(row.soldBy),
+      },
+      {
+        key: 'created',
+        header: 'Created',
+        render: (row) => (
+          <span className="text-[var(--admin-muted)]">
+            {new Date(row.createdAt).toLocaleDateString()}
+          </span>
+        ),
+      },
+      {
+        key: 'actions',
+        header: 'Actions',
+        render: (row) =>
+          !row.isUsed ? (
             <button
-              onClick={() => setShowGenerateModal(true)}
-              className="bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white px-6 py-3 rounded-xl font-semibold shadow-lg shadow-emerald-500/25 transition-all duration-300 hover:-translate-y-0.5"
+              type="button"
+              onClick={() => toggleKeyForSale(row._id)}
+              className="admin-btn admin-btn-secondary !py-1.5 !px-3"
             >
-              Generate Keys
+              {row.isForSale ? 'Remove sale' : 'Put for sale'}
+            </button>
+          ) : (
+            <span className="text-xs text-[var(--admin-faint)]">—</span>
+          ),
+      },
+    ];
+
+  return (
+    <div className="space-y-6">
+      <PageHeader
+        icon={KeyRound}
+        title="Activation keys"
+        description="Generate and manage user activation keys"
+        actions={
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={exportToCSV}
+              className="admin-btn admin-btn-secondary"
+              disabled={!keys.length}
+            >
+              Export CSV
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowGenerateModal(true)}
+              className="admin-btn admin-btn-primary"
+            >
+              Generate keys
             </button>
           </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-left text-sm text-slate-200">
-              <thead className="bg-slate-800/80 text-slate-300">
-                <tr>
-                  <th className="px-4 py-3 font-semibold">Key</th>
-                  <th className="px-4 py-3 font-semibold">Status</th>
-                  <th className="px-4 py-3 font-semibold">Price</th>
-                  <th className="px-4 py-3 font-semibold">For Sale</th>
-                  <th className="px-4 py-3 font-semibold">Used By</th>
-                  <th className="px-4 py-3 font-semibold">Purchased By</th>
-                  <th className="px-4 py-3 font-semibold">Sold By</th>
-                  <th className="px-4 py-3 font-semibold">Created</th>
-                  <th className="px-4 py-3 font-semibold">Used At</th>
-                  <th className="px-4 py-3 font-semibold">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-700/50">
-                {keys.map((key) => (
-                  <tr key={key._id} className="hover:bg-slate-800/40 transition-colors">
-                    <td className="px-4 py-3 align-top">
-                      <code className="text-xs font-mono bg-slate-800/70 px-2 py-1 rounded-lg block break-all">{key.key}</code>
-                    </td>
-                    <td className="px-4 py-3 align-top">
-                      <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
-                        key.isUsed
-                          ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
-                          : key.isForSale
-                          ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
-                          : 'bg-slate-600/40 text-slate-200 border border-slate-600/60'
-                      }`}>
-                        {key.isUsed ? 'Used' : key.isForSale ? 'For Sale' : 'Generated'}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 align-top">₹{key.price}</td>
-                    <td className="px-4 py-3 align-top">{key.isForSale ? 'Yes' : 'No'}</td>
-                    <td className="px-4 py-3 align-top">
-                      {key.usedBy ? (
-                        <div>
-                          <p className="font-semibold text-slate-100">{key.usedBy.name}</p>
-                          {key.usedBy.email && <p className="text-xs text-slate-400">{key.usedBy.email}</p>}
-                        </div>
-                      ) : (
-                        <span className="text-slate-500">-</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 align-top">
-                      {key.purchasedBy ? (
-                        <div>
-                          <p className="font-semibold text-slate-100">{key.purchasedBy.name}</p>
-                          {key.purchasedBy.email && <p className="text-xs text-slate-400">{key.purchasedBy.email}</p>}
-                        </div>
-                      ) : (
-                        <span className="text-slate-500">-</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 align-top">
-                      {key.soldBy ? (
-                        <div>
-                          <p className="font-semibold text-slate-100">{key.soldBy.name}</p>
-                          {key.soldBy.email && <p className="text-xs text-slate-400">{key.soldBy.email}</p>}
-                        </div>
-                      ) : (
-                        <span className="text-slate-500">-</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 align-top">{new Date(key.createdAt).toLocaleDateString()}</td>
-                    <td className="px-4 py-3 align-top">
-                      {key.usedAt ? new Date(key.usedAt).toLocaleDateString() : '-'}
-                    </td>
-                    <td className="px-4 py-3 align-top">
-                      <div className="flex items-center gap-2">
-                        {!key.isUsed && (
-                          <button
-                            onClick={() => toggleKeyForSale(key._id)}
-                            className={`px-3 py-2 rounded-xl text-xs font-medium transition-all duration-200 ${
-                              key.isForSale
-                                ? 'bg-amber-500/20 text-amber-300 hover:bg-amber-500/30 border border-amber-500/30'
-                                : 'bg-slate-700/50 text-slate-200 hover:bg-slate-600/50 border border-slate-600/50'
-                            }`}
-                          >
-                            {key.isForSale ? 'Remove Sale' : 'Put for Sale'}
-                          </button>
-                        )}
-                        <button className="px-3 py-2 bg-slate-700/50 text-slate-200 hover:bg-slate-600/50 rounded-xl text-xs font-medium transition-all duration-200 border border-slate-600/50">
-                          Edit
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+        }
+      />
+
+      <StatStrip
+        items={[
+          { label: 'Total keys', value: pagination.total },
+          {
+            label: 'Used (page)',
+            value: keys.filter((k) => k.isUsed).length,
+            hint: 'Current page',
+          },
+          {
+            label: 'Available (page)',
+            value: keys.filter((k) => !k.isUsed).length,
+            hint: 'Current page',
+          },
+          {
+            label: 'For sale (page)',
+            value: keys.filter((k) => k.isForSale && !k.isUsed).length,
+            hint: 'Current page',
+          },
+        ]}
+      />
+
+      <DataTable
+        columns={columns}
+        rows={keys}
+        rowKey={(k) => k._id}
+        loading={loading}
+        emptyTitle="No activation keys"
+        emptyDescription="Generate your first activation keys to get started"
+        emptyAction={
+          <button
+            type="button"
+            onClick={() => setShowGenerateModal(true)}
+            className="admin-btn admin-btn-primary"
+          >
+            Generate keys
+          </button>
+        }
+        footer={
+          <Pagination
+            page={pagination.page}
+            totalPages={pagination.totalPages}
+            total={pagination.total}
+            limit={pagination.limit}
+            onPageChange={pagination.setPage}
+            onLimitChange={pagination.setLimit}
+            limitOptions={[10, 25, 50]}
+          />
+        }
+      />
+
+      <AdminModal
+        open={showGenerateModal}
+        title="Generate keys"
+        onClose={() => setShowGenerateModal(false)}
+        footer={
+          <>
+            <button
+              type="button"
+              className="admin-btn admin-btn-secondary"
+              onClick={() => setShowGenerateModal(false)}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="admin-btn admin-btn-primary"
+              disabled={generating}
+              onClick={generateKeys}
+            >
+              {generating ? 'Generating…' : 'Generate keys'}
+            </button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="admin-label">Number of keys</label>
+            <input
+              type="number"
+              min={1}
+              max={100}
+              className="admin-input"
+              value={generateCount}
+              onChange={(e) => setGenerateCount(parseInt(e.target.value, 10) || 10)}
+            />
+            <p className="mt-1 text-xs text-[var(--admin-faint)]">Maximum 100 per batch</p>
           </div>
-        )}
-      </div>
-
-      {/* Generate Keys Modal */}
-      {showGenerateModal && (
-        <div className="fixed inset-0 backdrop-blur-sm bg-black/50 flex items-center justify-center p-4 z-50">
-          <div className="bg-gradient-to-br from-slate-800/95 to-slate-900/95 backdrop-blur-xl rounded-3xl max-w-lg w-full border border-slate-700/50 shadow-2xl">
-            {/* Header */}
-            <div className="flex items-center justify-between p-8 pb-6">
-              <div className="flex items-center space-x-3">
-                <div className="w-12 h-12 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-2xl flex items-center justify-center shadow-lg">
-                  <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
-                  </svg>
-                </div>
-                <div>
-                  <h3 className="text-2xl font-bold text-slate-100">Generate Keys</h3>
-                  <p className="text-slate-400 text-sm">Create new activation keys for users</p>
-                </div>
-              </div>
-              <button
-                onClick={() => setShowGenerateModal(false)}
-                className="w-8 h-8 bg-slate-700/50 hover:bg-slate-600/50 rounded-xl flex items-center justify-center transition-colors"
-              >
-                <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-
-            {/* Form */}
-            <div className="px-8 pb-8">
-              <div className="space-y-6">
-                {/* Count Input */}
-                <div className="relative">
-                  <label className="block text-sm font-medium text-slate-300 mb-2">Number of Keys</label>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                      <svg className="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 20l4-16m2 16l4-16M6 9h14M4 15h16" />
-                      </svg>
-                    </div>
-                    <input
-                      type="number"
-                      min="1"
-                      max="100"
-                      placeholder="10"
-                      value={generateCount}
-                      onChange={(e) => setGenerateCount(parseInt(e.target.value) || 10)}
-                      className="w-full pl-12 pr-4 py-4 bg-slate-700/50 border border-slate-600/50 rounded-2xl text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500/50 transition-all duration-200"
-                    />
-                  </div>
-                  <p className="text-xs text-slate-500 mt-1">Maximum 100 keys per batch</p>
-                </div>
-
-                {/* Price Input */}
-                <div className="relative">
-                  <label className="block text-sm font-medium text-slate-300 mb-2">Price per Key (₹)</label>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                      <span className="text-slate-400 font-semibold">₹</span>
-                    </div>
-                    <input
-                      type="number"
-                      min="0"
-                      step="100"
-                      placeholder="2000"
-                      value={generatePrice}
-                      onChange={(e) => setGeneratePrice(parseInt(e.target.value) || 2000)}
-                      className="w-full pl-12 pr-4 py-4 bg-slate-700/50 border border-slate-600/50 rounded-2xl text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500/50 transition-all duration-200"
-                    />
-                  </div>
-                  <p className="text-xs text-slate-500 mt-1">Set to 0 for free keys</p>
-                </div>
-
-                {/* Marketplace Toggle */}
-                <div className="bg-slate-700/30 rounded-2xl p-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1">
-                      <h4 className="text-slate-100 font-medium mb-1">Available for Sale</h4>
-                      <p className="text-slate-400 text-sm">Users can purchase these keys on the marketplace</p>
-                    </div>
-                    <button
-                      onClick={() => setGenerateForSale(!generateForSale)}
-                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 ${
-                        generateForSale ? 'bg-emerald-500' : 'bg-slate-600'
-                      }`}
-                    >
-                      <span
-                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform duration-200 ${
-                          generateForSale ? 'translate-x-6' : 'translate-x-1'
-                        }`}
-                      />
-                    </button>
-                  </div>
-                  {generateForSale && (
-                    <div className="mt-3 p-3 bg-emerald-500/10 rounded-xl border border-emerald-500/20">
-                      <p className="text-xs text-emerald-400">
-                        ✓ Users can earn referral commissions when they sell these keys
-                      </p>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Actions */}
-              <div className="flex space-x-4 mt-8">
-                <button
-                  onClick={() => setShowGenerateModal(false)}
-                  className="flex-1 px-6 py-4 bg-slate-700/50 hover:bg-slate-600/50 text-slate-300 hover:text-slate-200 rounded-2xl font-semibold transition-all duration-200 border border-slate-600/50"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={generateKeys}
-                  className="flex-1 px-6 py-4 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white rounded-2xl font-semibold shadow-lg shadow-emerald-500/25 hover:shadow-emerald-500/40 transition-all duration-300 hover:-translate-y-0.5"
-                >
-                  Generate Keys
-                </button>
-              </div>
-            </div>
+          <div>
+            <label className="admin-label">Price per key (₹)</label>
+            <input
+              type="number"
+              min={0}
+              step={100}
+              className="admin-input"
+              value={generatePrice}
+              onChange={(e) => setGeneratePrice(parseInt(e.target.value, 10) || 0)}
+            />
           </div>
+          <label className="flex items-center justify-between gap-3 rounded-[var(--admin-radius)] border border-[var(--admin-border)] px-4 py-3">
+            <div>
+              <p className="text-sm font-semibold">Available for sale</p>
+              <p className="text-xs text-[var(--admin-muted)]">
+                Users can purchase these keys on the marketplace
+              </p>
+            </div>
+            <input
+              type="checkbox"
+              checked={generateForSale}
+              onChange={(e) => setGenerateForSale(e.target.checked)}
+            />
+          </label>
         </div>
-      )}
+      </AdminModal>
     </div>
   );
 }

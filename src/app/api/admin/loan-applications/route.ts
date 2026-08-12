@@ -53,6 +53,9 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const search = (searchParams.get('search') || '').trim();
     const status = (searchParams.get('status') || '').trim();
+    const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(searchParams.get('limit') || '20', 10) || 20));
+    const skip = (page - 1) * limit;
 
     const query: any = {};
 
@@ -81,9 +84,14 @@ export async function GET(request: NextRequest) {
       ];
     }
 
-    const applications = await LoanApplication.find(query)
-      .populate('property', 'title')
-      .sort({ createdAt: -1 });
+    const [applications, total] = await Promise.all([
+      LoanApplication.find(query)
+        .populate('property', 'title')
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit),
+      LoanApplication.countDocuments(query),
+    ]);
 
     const leadPairs = applications
       .map((application: any) => ({
@@ -136,7 +144,14 @@ export async function GET(request: NextRequest) {
             : null,
           createdAt: application.createdAt
         };
-      })
+      }),
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.max(1, Math.ceil(total / limit) || 1),
+        pages: Math.max(1, Math.ceil(total / limit) || 1),
+      }
     });
   } catch (error: any) {
     console.error('Get loan applications error:', error);

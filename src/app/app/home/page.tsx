@@ -5,6 +5,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import AppHeader from '@/components/app/AppHeader';
 import CoinAmount from '@/components/app/CoinAmount';
 import AdCard from '@/components/app/AdCard';
+import AdMedia from '@/components/app/AdMedia';
 import {
   Wallet,
   TrendingUp,
@@ -51,6 +52,7 @@ export default function HomePage() {
         title: ad.title,
         description: ad.description,
         imageUrl: ad.image,
+        mediaType: ad.mediaType === 'video' ? 'video' : 'image',
         reward: ad.rewardAmount,
         verificationPeriod: ad.verificationPeriodHours === 0 ? 'instant' : `hour${ad.verificationPeriodHours}`,
         vendor: { name: ad.vendor?.businessName || ad.vendor?.name || 'Unknown' },
@@ -310,7 +312,12 @@ export default function HomePage() {
               {/* Image */}
               {selectedAd.imageUrl && (
                 <div className="h-52 bg-slate-950">
-                  <img src={selectedAd.imageUrl} alt={selectedAd.title} className="w-full h-full object-cover" />
+                  <AdMedia
+                    src={selectedAd.imageUrl}
+                    alt={selectedAd.title}
+                    mediaType={selectedAd.mediaType}
+                    className="w-full h-full object-cover"
+                  />
                 </div>
               )}
               

@@ -1,146 +1,146 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect, useMemo, useState, type ComponentType } from 'react';
+import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { AdminPermission, ADMIN_NAV_PERMISSIONS, hasAdminPermission, normalizePermissions } from '@/lib/adminPermissions';
+import {
+  LayoutDashboard,
+  BarChart3,
+  Store,
+  Package,
+  Megaphone,
+  Heart,
+  Users,
+  UserCog,
+  Wallet,
+  KeyRound,
+  Key,
+  Layers,
+  BadgePercent,
+  Banknote,
+  TrendingUp,
+  Percent,
+  ClipboardList,
+  FileText,
+  ChevronLeft,
+  ChevronRight,
+  Menu,
+  X,
+  LogOut,
+  type LucideProps,
+} from 'lucide-react';
+import {
+  AdminPermission,
+  ADMIN_NAV_PERMISSIONS,
+  hasAdminPermission,
+  normalizePermissions,
+} from '@/lib/adminPermissions';
+import './admin-theme.css';
 
-interface AdminLayoutProps {
-  children: React.ReactNode;
-}
+type NavIcon = ComponentType<LucideProps>;
 
-const navigation = [
-  {
-    name: 'Dashboard',
-    href: '/admin/dashboard',
-    icon: 'LayoutDashboard',
-    current: false
-  },
-  {
-    name: 'Vendors',
-    href: '/admin/vendors',
-    icon: 'Store',
-    current: false
-  },
-  {
-    name: 'Packages',
-    href: '/admin/packages',
-    icon: 'Package',
-    current: false
-  },
-  {
-    name: 'Advertisements',
-    href: '/admin/advertisements',
-    icon: 'Megaphone',
-    current: false
-  },
-  {
-    name: 'Sub Admins',
-    href: '/admin/sub-admins',
-    icon: 'Users',
-    current: false
-  },
-  {
-    name: 'MyStatus Ads',
-    href: '/admin/mystatus-ads',
-    icon: 'Heart',
-    current: false
-  },
-  {
-    name: 'Property Leads',
-    href: '/admin/property-leads',
-    icon: 'ClipboardList',
-    current: false
-  },
-  {
-    name: 'Loan Requests',
-    href: '/admin/loan-applications',
-    icon: 'DocumentText',
-    current: false
-  },
-  {
-    name: 'Users',
-    href: '/admin/users',
-    icon: 'Users',
-    current: false
-  },
-  {
-    name: 'Wallet Management',
-    href: '/admin/users/wallet-management',
-    icon: 'Wallet',
-    current: false
-  },
-  {
-    name: 'Withdrawals',
-    href: '/admin/withdrawals',
-    icon: 'BankNotes',
-    current: false
-  },
-  {
-    name: 'Activation Keys',
-    href: '/admin/activation-keys',
-    icon: 'Key',
-    current: false
-  },
-  {
-    name: 'Franchise Keys',
-    href: '/admin/franchise-keys',
-    icon: 'Key',
-    current: false
-  },
-  {
-    name: 'Key Tiers',
-    href: '/admin/key-tiers',
-    icon: 'Layers',
-    current: false
-  },
-  {
-    name: 'Franchise Tiers',
-    href: '/admin/franchise-tiers',
-    icon: 'Layers',
-    current: false
-  },
-  {
-    name: 'Franchise Payouts',
-    href: '/admin/franchise-payouts',
-    icon: 'TrendingUp',
-    current: false
-  },
-  {
-    name: 'Product Keys',
-    href: '/admin/product-keys',
-    icon: 'Key',
-    current: false
-  },
+type NavItem = {
+  name: string;
+  href: string;
+  icon: NavIcon;
+};
 
+type NavGroup = {
+  label: string;
+  items: NavItem[];
+};
+
+const NAV_GROUPS: NavGroup[] = [
   {
-    name: 'Analytics',
-    href: '/admin/analytics',
-    icon: 'BarChart3',
-    current: false
-  }
+    label: 'Overview',
+    items: [
+      { name: 'Dashboard', href: '/admin/dashboard', icon: LayoutDashboard },
+      { name: 'Analytics', href: '/admin/analytics', icon: BarChart3 },
+    ],
+  },
+  {
+    label: 'Commerce',
+    items: [
+      { name: 'Vendors', href: '/admin/vendors', icon: Store },
+      { name: 'Packages', href: '/admin/packages', icon: Package },
+      { name: 'Advertisements', href: '/admin/advertisements', icon: Megaphone },
+      { name: 'MyStatus Ads', href: '/admin/mystatus-ads', icon: Heart },
+    ],
+  },
+  {
+    label: 'People',
+    items: [
+      { name: 'Users', href: '/admin/users', icon: Users },
+      { name: 'Sub Admins', href: '/admin/sub-admins', icon: UserCog },
+      { name: 'Wallet', href: '/admin/users/wallet-management', icon: Wallet },
+    ],
+  },
+  {
+    label: 'Keys',
+    items: [
+      { name: 'Activation Keys', href: '/admin/activation-keys', icon: KeyRound },
+      { name: 'Franchise Keys', href: '/admin/franchise-keys', icon: Key },
+      { name: 'Product Keys', href: '/admin/product-keys', icon: BadgePercent },
+      { name: 'Key Tiers', href: '/admin/key-tiers', icon: Layers },
+      { name: 'Franchise Tiers', href: '/admin/franchise-tiers', icon: Layers },
+    ],
+  },
+  {
+    label: 'Finance',
+    items: [
+      { name: 'Withdrawals', href: '/admin/withdrawals', icon: Banknote },
+      { name: 'Franchise Payouts', href: '/admin/franchise-payouts', icon: TrendingUp },
+      { name: 'Commission Rates', href: '/admin/commission-rates', icon: Percent },
+    ],
+  },
+  {
+    label: 'Ops',
+    items: [
+      { name: 'Property Leads', href: '/admin/property-leads', icon: ClipboardList },
+      { name: 'Loan Requests', href: '/admin/loan-applications', icon: FileText },
+    ],
+  },
 ];
 
-export default function AdminLayout({ children }: AdminLayoutProps) {
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [darkMode, setDarkMode] = useState(false);
+function isActivePath(pathname: string, href: string) {
+  if (href === '/admin/users') {
+    return (
+      pathname === '/admin/users' ||
+      (pathname.startsWith('/admin/users/') && !pathname.includes('wallet-management'))
+    );
+  }
+  return pathname === href || pathname.startsWith(`${href}/`);
+}
+
+function BrandMark({ compact = false }: { compact?: boolean }) {
+  return (
+    <div className={`flex min-w-0 items-center ${compact ? 'justify-center' : 'gap-3'}`}>
+      <div className="relative h-9 w-9 shrink-0 overflow-hidden rounded-xl border border-slate-600/60 bg-white shadow-sm">
+        <Image src="/mystatus.jpeg" alt="MyStatus" fill className="object-cover" sizes="36px" />
+      </div>
+      {!compact ? (
+        <div className="min-w-0">
+          <p className="admin-display truncate text-sm font-semibold tracking-tight">MyStatus</p>
+          <p className="text-[11px] uppercase tracking-[0.12em] text-[var(--admin-faint)]">Admin</p>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+export default function AdminLayout({ children }: { children: React.ReactNode }) {
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
   const [adminRole, setAdminRole] = useState<'admin' | 'sub-admin'>('admin');
   const [adminPermissions, setAdminPermissions] = useState<AdminPermission[]>([]);
+  const [adminEmail, setAdminEmail] = useState('admin');
   const pathname = usePathname();
   const router = useRouter();
 
   useEffect(() => {
-    // Check for saved theme preference or default to light mode
-    const savedTheme = localStorage.getItem('admin-theme');
-    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    const shouldBeDark = savedTheme === 'dark' || (!savedTheme && prefersDark);
-    setDarkMode(shouldBeDark);
-
-    if (shouldBeDark) {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
+    const saved = localStorage.getItem('admin-sidebar-collapsed');
+    setCollapsed(saved === '1');
   }, []);
 
   useEffect(() => {
@@ -150,6 +150,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
         const parsed = JSON.parse(cachedAdmin);
         setAdminRole(parsed.role === 'sub-admin' ? 'sub-admin' : 'admin');
         setAdminPermissions(normalizePermissions(parsed.permissions));
+        setAdminEmail(parsed.email || 'admin');
       } catch {}
     }
 
@@ -159,26 +160,27 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     fetch('/api/admin/me', {
       headers: { Authorization: `Bearer ${token}` },
     })
-      .then((res) => res.ok ? res.json() : null)
+      .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
         if (!data?.success) return;
         localStorage.setItem('adminUser', JSON.stringify(data.admin));
         setAdminRole(data.admin.role === 'sub-admin' ? 'sub-admin' : 'admin');
         setAdminPermissions(normalizePermissions(data.admin.permissions));
+        setAdminEmail(data.admin.email || 'admin');
       })
       .catch(() => {});
   }, []);
 
-  const toggleDarkMode = () => {
-    const newDarkMode = !darkMode;
-    setDarkMode(newDarkMode);
-    localStorage.setItem('admin-theme', newDarkMode ? 'dark' : 'light');
+  useEffect(() => {
+    setMobileOpen(false);
+  }, [pathname]);
 
-    if (newDarkMode) {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
+  const toggleCollapsed = () => {
+    setCollapsed((prev) => {
+      const next = !prev;
+      localStorage.setItem('admin-sidebar-collapsed', next ? '1' : '0');
+      return next;
+    });
   };
 
   const handleLogout = () => {
@@ -187,393 +189,175 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     router.push('/admin/login');
   };
 
-  const visibleNavigation = navigation.filter((item) => {
-    if (adminRole === 'admin') return true;
-    const requiredPermissions = ADMIN_NAV_PERMISSIONS[item.href];
-    if (!requiredPermissions) return false;
-    if (requiredPermissions.length === 0) return false;
-    return hasAdminPermission(adminPermissions, requiredPermissions);
-  });
+  const groups = useMemo(() => {
+    return NAV_GROUPS.map((group) => ({
+      ...group,
+      items: group.items.filter((item) => {
+        if (adminRole === 'admin') return true;
+        const required = ADMIN_NAV_PERMISSIONS[item.href];
+        if (!required) return false;
+        if (required.length === 0) return false;
+        return hasAdminPermission(adminPermissions, required);
+      }),
+    })).filter((group) => group.items.length > 0);
+  }, [adminRole, adminPermissions]);
 
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
-      {/* Mobile sidebar backdrop */}
-      {sidebarOpen && (
+  const currentTitle =
+    groups.flatMap((g) => g.items).find((item) => isActivePath(pathname, item.href))?.name ||
+    'Admin';
+
+  const sidebarInner = (mode: 'desktop' | 'mobile') => {
+    const isCollapsed = mode === 'desktop' && collapsed;
+
+    return (
+      <div className="flex h-full flex-col">
         <div
-          className="fixed inset-0 z-40 backdrop-blur-sm bg-black/50 lg:hidden"
-          onClick={() => setSidebarOpen(false)}
-        />
-      )}
-
-      {/* Desktop Layout */}
-      <div className="hidden lg:flex lg:min-h-screen">
-        {/* Sidebar */}
-        <div className="w-72 bg-gradient-to-b from-slate-800/95 to-slate-900/95 backdrop-blur-xl border-r border-slate-700/50 flex flex-col shadow-2xl">
-          <div className="flex flex-col h-full">
-            {/* Logo */}
-            <div className="flex items-center justify-center h-20 px-6 bg-gradient-to-r from-emerald-500 to-teal-600 shadow-lg">
-              <div className="flex items-center">
-                <div className="relative">
-                  <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-lg">
-                    <span className="text-emerald-600 font-bold text-lg">MS</span>
-                  </div>
-                  <div className="absolute -top-1 -right-1 w-4 h-4 bg-emerald-400 rounded-full animate-pulse"></div>
-                </div>
-                <div className="ml-4">
-                  <h1 className="text-white font-bold text-xl tracking-tight">MyStatus</h1>
-                  <p className="text-emerald-100 text-xs font-medium">Admin Panel</p>
-                </div>
-              </div>
-            </div>
-
-            {/* Theme Toggle */}
-            {/* <div className="px-6 py-4">
-              <button
-                onClick={toggleDarkMode}
-                className="group flex items-center justify-between w-full px-4 py-3 text-sm bg-slate-700/50 hover:bg-slate-600/50 rounded-xl border border-slate-600/30 transition-all duration-200 hover:border-slate-500/50"
-              >
-                <div className="flex items-center">
-                  <div className="w-8 h-8 bg-gradient-to-br from-amber-400 to-orange-500 rounded-lg flex items-center justify-center mr-3 shadow-lg">
-                    {darkMode ? (
-                      <svg className="w-4 h-4 text-slate-900" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z" clipRule="evenodd" />
-                      </svg>
-                    ) : (
-                      <svg className="w-4 h-4 text-slate-900" fill="currentColor" viewBox="0 0 20 20">
-                        <path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z" />
-                      </svg>
-                    )}
-                  </div>
-                  <span className="text-slate-300 font-medium">Theme</span>
-                </div>
-                <div className="flex items-center">
-                  <span className="text-xs text-slate-400 mr-2">
-                  {darkMode ? 'Light' : 'Dark'}
-                </span>
-                  <div className={`w-8 h-4 rounded-full transition-colors ${darkMode ? 'bg-emerald-500' : 'bg-slate-600'}`}>
-                    <div className={`w-3 h-3 bg-white rounded-full transition-transform duration-200 ${darkMode ? 'translate-x-4' : 'translate-x-0.5'}`}></div>
-                  </div>
-                </div>
-              </button>
-            </div> */}
-
-            {/* Navigation */}
-            <nav className="flex-1 px-4 py-6">
-              <div className="space-y-2">
-              {visibleNavigation.map((item) => {
-                const isActive = pathname === item.href;
-                return (
-                  <Link
-                    key={item.name}
-                    href={item.href}
-                      className={`group relative flex items-center px-4 py-4 text-sm font-medium rounded-2xl transition-all duration-200 ${
-                      isActive
-                          ? 'bg-gradient-to-r from-emerald-500/20 to-teal-500/20 text-emerald-300 shadow-lg shadow-emerald-500/10 border border-emerald-500/30'
-                          : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/30 hover:shadow-md'
-                      }`}
-                    >
-                      {isActive && (
-                        <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-gradient-to-b from-emerald-400 to-teal-500 rounded-r-full"></div>
-                      )}
-                      <div className={`w-9 h-9 rounded-xl flex items-center justify-center mr-4 transition-all duration-200 ${
-                        isActive
-                          ? 'bg-gradient-to-br from-emerald-400 to-teal-500 shadow-lg'
-                          : 'bg-slate-700/50 group-hover:bg-slate-600/50'
-                      }`}>
-                        {item.icon === 'LayoutDashboard' && (
-                          <svg className={`w-5 h-5 ${isActive ? 'text-white' : 'text-slate-400 group-hover:text-slate-300'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2z" />
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5a2 2 0 012-2h4a2 2 0 012 2v2H8V5z" />
-                          </svg>
-                        )}
-                        {item.icon === 'Store' && (
-                          <svg className={`w-5 h-5 ${isActive ? 'text-white' : 'text-slate-400 group-hover:text-slate-300'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
-                          </svg>
-                        )}
-                        {item.icon === 'Package' && (
-                          <svg className={`w-5 h-5 ${isActive ? 'text-white' : 'text-slate-400 group-hover:text-slate-300'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-                          </svg>
-                        )}
-                        {item.icon === 'Megaphone' && (
-                          <svg className={`w-5 h-5 ${isActive ? 'text-white' : 'text-slate-400 group-hover:text-slate-300'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z" />
-                          </svg>
-                        )}
-                        {item.icon === 'Heart' && (
-                          <svg className={`w-5 h-5 ${isActive ? 'text-white' : 'text-slate-400 group-hover:text-slate-300'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-                          </svg>
-                        )}
-                        {item.icon === 'CheckCircle' && (
-                          <svg className={`w-5 h-5 ${isActive ? 'text-white' : 'text-slate-400 group-hover:text-slate-300'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                          </svg>
-                        )}
-                        {item.icon === 'ClipboardList' && (
-                          <svg className={`w-5 h-5 ${isActive ? 'text-white' : 'text-slate-400 group-hover:text-slate-300'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5h6a2 2 0 012 2v12a2 2 0 01-2 2H9a2 2 0 01-2-2V7a2 2 0 012-2z" />
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5a2 2 0 104 0M9 9h6M9 13h6M9 17h4" />
-                          </svg>
-                        )}
-                        {item.icon === 'DocumentText' && (
-                          <svg className={`w-5 h-5 ${isActive ? 'text-white' : 'text-slate-400 group-hover:text-slate-300'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                          </svg>
-                        )}
-                        {item.icon === 'Users' && (
-                          <svg className={`w-5 h-5 ${isActive ? 'text-white' : 'text-slate-400 group-hover:text-slate-300'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z" />
-                          </svg>
-                        )}
-                        {item.icon === 'Wallet' && (
-                          <svg className={`w-5 h-5 ${isActive ? 'text-white' : 'text-slate-400 group-hover:text-slate-300'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
-                          </svg>
-                        )}
-                        {item.icon === 'BankNotes' && (
-                          <svg className={`w-5 h-5 ${isActive ? 'text-white' : 'text-slate-400 group-hover:text-slate-300'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.25 18.75a60.07 60.07 0 0115.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 013 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25M2.25 6v9m18-10.5v.75c0 .414.336.75.75.75h.75m-1.5-1.5h.375c.621 0 1.125.504 1.125 1.125v9.75c0 .621-.504 1.125-1.125 1.125h-.375m1.5-1.5H21a.75.75 0 00-.75.75v.75m0 0H3.75m0 0h-.375a1.125 1.125 0 01-1.125-1.125V15m1.5 1.5v-.75A.75.75 0 003 15h-.75M15 10.5a3 3 0 11-6 0 3 3 0 016 0zm3 0h.008v.008H18V10.5zm-12 0h.008v.008H6V10.5z" />
-                          </svg>
-                        )}
-                        {item.icon === 'Key' && (
-                          <svg className={`w-5 h-5 ${isActive ? 'text-white' : 'text-slate-400 group-hover:text-slate-300'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
-                          </svg>
-                        )}
-                        {item.icon === 'Layers' && (
-                          <svg className={`w-5 h-5 ${isActive ? 'text-white' : 'text-slate-400 group-hover:text-slate-300'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3l9 5-9 5-9-5 9-5z" />
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l9 5 9-5" />
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 17l9 5 9-5" />
-                          </svg>
-                        )}
-                        {item.icon === 'TrendingUp' && (
-                          <svg className={`w-5 h-5 ${isActive ? 'text-white' : 'text-slate-400 group-hover:text-slate-300'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-                          </svg>
-                        )}
-                        {item.icon === 'BarChart3' && (
-                          <svg className={`w-5 h-5 ${isActive ? 'text-white' : 'text-slate-400 group-hover:text-slate-300'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                          </svg>
-                        )}
-                      </div>
-                      <span className={`font-medium transition-colors ${
-                        isActive ? 'text-emerald-300' : 'text-slate-400 group-hover:text-slate-200'
-                      }`}>
-                    {item.name}
-                      </span>
-                  </Link>
-                );
-              })}
-              </div>
-            </nav>
-
-            {/* Logout */}
-            <div className="p-6">
-              <button
-              onClick={handleLogout}
-                className="group flex items-center w-full px-4 py-4 text-sm font-medium text-slate-400 hover:text-slate-200 rounded-2xl hover:bg-slate-700/30 transition-all duration-200 hover:shadow-md"
-              >
-                <div className="w-9 h-9 bg-slate-700/50 rounded-xl flex items-center justify-center mr-4 group-hover:bg-red-500/20 transition-colors">
-                  <svg className="w-5 h-5 text-slate-400 group-hover:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                  </svg>
-                </div>
-                <span>Sign Out</span>
-              </button>
-            </div>
-          </div>
+          className={`flex h-16 items-center border-b border-slate-800 ${
+            isCollapsed ? 'justify-center px-2' : 'justify-between gap-2 px-4'
+          }`}
+        >
+          <BrandMark compact={isCollapsed} />
+          {mode === 'mobile' ? (
+            <button
+              type="button"
+              onClick={() => setMobileOpen(false)}
+              className="rounded-lg p-2 text-[var(--admin-muted)] hover:bg-white/5 hover:text-[var(--admin-text)]"
+              aria-label="Close menu"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          ) : null}
         </div>
 
-        {/* Main content */}
-        <div className="flex-1 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
-          <div className="min-h-screen">
-          {children}
-          </div>
+        <nav className="flex-1 space-y-4 overflow-y-auto px-2 py-4">
+          {groups.map((group) => (
+            <div key={group.label}>
+              {!isCollapsed ? (
+                <p className="mb-1.5 px-2.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--admin-faint)]">
+                  {group.label}
+                </p>
+              ) : null}
+              <ul className="space-y-0.5">
+                {group.items.map((item) => {
+                  const active = isActivePath(pathname, item.href);
+                  const Icon = item.icon;
+                  return (
+                    <li key={item.href}>
+                      <Link
+                        href={item.href}
+                        title={item.name}
+                        className={`flex items-center rounded-xl text-sm transition-colors ${
+                          isCollapsed ? 'justify-center px-0 py-2.5' : 'gap-3 px-2.5 py-2'
+                        } ${
+                          active
+                            ? 'bg-emerald-500/15 text-emerald-300'
+                            : 'text-[var(--admin-muted)] hover:bg-white/[0.04] hover:text-[var(--admin-text)]'
+                        }`}
+                      >
+                        <Icon
+                          className={`h-[18px] w-[18px] shrink-0 ${
+                            active ? 'text-emerald-400' : 'text-[var(--admin-faint)]'
+                          }`}
+                          strokeWidth={1.9}
+                        />
+                        {!isCollapsed ? (
+                          <span className="truncate font-medium">{item.name}</span>
+                        ) : null}
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          ))}
+        </nav>
+
+        <div className={`border-t border-slate-800 p-3 ${isCollapsed ? 'px-2' : ''}`}>
+          {!isCollapsed ? (
+            <p className="mb-2 truncate text-xs text-[var(--admin-faint)]" title={adminEmail}>
+              {adminEmail}
+            </p>
+          ) : null}
+          <button
+            type="button"
+            onClick={handleLogout}
+            className={`admin-btn admin-btn-secondary w-full ${isCollapsed ? '!px-0' : ''}`}
+            title="Sign out"
+          >
+            <LogOut className="h-4 w-4" />
+            {!isCollapsed ? 'Sign out' : null}
+          </button>
         </div>
       </div>
+    );
+  };
 
-      {/* Mobile Layout */}
-      <div className="lg:hidden">
-        {/* Mobile Sidebar */}
-        <div className={`fixed inset-y-0 left-0 z-50 w-72 bg-gradient-to-b from-slate-800/95 to-slate-900/95 backdrop-blur-xl border-r border-slate-700/50 shadow-2xl transform ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} transition-transform duration-300 ease-in-out`}>
-          <div className="flex flex-col h-full">
-            {/* Logo */}
-            <div className="flex items-center justify-center h-20 px-6 bg-gradient-to-r from-emerald-500 to-teal-600 shadow-lg">
-              <div className="flex items-center">
-                <div className="relative">
-                  <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-lg">
-                    <span className="text-emerald-600 font-bold text-lg">MS</span>
-                  </div>
-                  <div className="absolute -top-1 -right-1 w-4 h-4 bg-emerald-400 rounded-full animate-pulse"></div>
-                </div>
-                <div className="ml-4">
-                  <h1 className="text-white font-bold text-xl tracking-tight">MyStatus</h1>
-                  <p className="text-emerald-100 text-xs font-medium">Admin Panel</p>
-                </div>
-              </div>
-            </div>
+  return (
+    <div className="admin-shell">
+      {mobileOpen ? (
+        <button
+          type="button"
+          aria-label="Close menu"
+          className="fixed inset-0 z-40 bg-slate-950/70 lg:hidden"
+          onClick={() => setMobileOpen(false)}
+        />
+      ) : null}
 
-            {/* Navigation */}
-            <nav className="flex-1 px-4 py-6">
-              <div className="space-y-2">
-              {visibleNavigation.map((item) => {
-                const isActive = pathname === item.href;
-                return (
-                  <Link
-                    key={item.name}
-                    href={item.href}
-                      className={`group relative flex items-center px-4 py-4 text-sm font-medium rounded-2xl transition-all duration-200 ${
-                      isActive
-                          ? 'bg-gradient-to-r from-emerald-500/20 to-teal-500/20 text-emerald-300 shadow-lg shadow-emerald-500/10 border border-emerald-500/30'
-                          : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/30 hover:shadow-md'
-                    }`}
-                    onClick={() => setSidebarOpen(false)}
-                  >
-                      {isActive && (
-                        <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-gradient-to-b from-emerald-400 to-teal-500 rounded-r-full"></div>
-                      )}
-                      <div className={`w-9 h-9 rounded-xl flex items-center justify-center mr-4 transition-all duration-200 ${
-                        isActive
-                          ? 'bg-gradient-to-br from-emerald-400 to-teal-500 shadow-lg'
-                          : 'bg-slate-700/50 group-hover:bg-slate-600/50'
-                      }`}>
-                        {item.icon === 'LayoutDashboard' && (
-                          <svg className={`w-5 h-5 ${isActive ? 'text-white' : 'text-slate-400 group-hover:text-slate-300'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2z" />
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5a2 2 0 012-2h4a2 2 0 012 2v2H8V5z" />
-                          </svg>
-                        )}
-                        {item.icon === 'Store' && (
-                          <svg className={`w-5 h-5 ${isActive ? 'text-white' : 'text-slate-400 group-hover:text-slate-300'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
-                          </svg>
-                        )}
-                        {item.icon === 'Package' && (
-                          <svg className={`w-5 h-5 ${isActive ? 'text-white' : 'text-slate-400 group-hover:text-slate-300'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-                          </svg>
-                        )}
-                        {item.icon === 'Megaphone' && (
-                          <svg className={`w-5 h-5 ${isActive ? 'text-white' : 'text-slate-400 group-hover:text-slate-300'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z" />
-                          </svg>
-                        )}
-                        {item.icon === 'Heart' && (
-                          <svg className={`w-5 h-5 ${isActive ? 'text-white' : 'text-slate-400 group-hover:text-slate-300'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-                          </svg>
-                        )}
-                        {item.icon === 'CheckCircle' && (
-                          <svg className={`w-5 h-5 ${isActive ? 'text-white' : 'text-slate-400 group-hover:text-slate-300'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                          </svg>
-                        )}
-                        {item.icon === 'ClipboardList' && (
-                          <svg className={`w-5 h-5 ${isActive ? 'text-white' : 'text-slate-400 group-hover:text-slate-300'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5h6a2 2 0 012 2v12a2 2 0 01-2 2H9a2 2 0 01-2-2V7a2 2 0 012-2z" />
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5a2 2 0 104 0M9 9h6M9 13h6M9 17h4" />
-                          </svg>
-                        )}
-                        {item.icon === 'DocumentText' && (
-                          <svg className={`w-5 h-5 ${isActive ? 'text-white' : 'text-slate-400 group-hover:text-slate-300'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                          </svg>
-                        )}
-                        {item.icon === 'Users' && (
-                          <svg className={`w-5 h-5 ${isActive ? 'text-white' : 'text-slate-400 group-hover:text-slate-300'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z" />
-                          </svg>
-                        )}
-                        {item.icon === 'Wallet' && (
-                          <svg className={`w-5 h-5 ${isActive ? 'text-white' : 'text-slate-400 group-hover:text-slate-300'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
-                          </svg>
-                        )}
-                        {item.icon === 'BankNotes' && (
-                          <svg className={`w-5 h-5 ${isActive ? 'text-white' : 'text-slate-400 group-hover:text-slate-300'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.25 18.75a60.07 60.07 0 0115.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 013 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25M2.25 6v9m18-10.5v.75c0 .414.336.75.75.75h.75m-1.5-1.5h.375c.621 0 1.125.504 1.125 1.125v9.75c0 .621-.504 1.125-1.125 1.125h-.375m1.5-1.5H21a.75.75 0 00-.75.75v.75m0 0H3.75m0 0h-.375a1.125 1.125 0 01-1.125-1.125V15m1.5 1.5v-.75A.75.75 0 003 15h-.75M15 10.5a3 3 0 11-6 0 3 3 0 016 0zm3 0h.008v.008H18V10.5zm-12 0h.008v.008H6V10.5z" />
-                          </svg>
-                        )}
-                        {item.icon === 'Key' && (
-                          <svg className={`w-5 h-5 ${isActive ? 'text-white' : 'text-slate-400 group-hover:text-slate-300'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
-                          </svg>
-                        )}
-                        {item.icon === 'Layers' && (
-                          <svg className={`w-5 h-5 ${isActive ? 'text-white' : 'text-slate-400 group-hover:text-slate-300'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3l9 5-9 5-9-5 9-5z" />
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l9 5 9-5" />
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 17l9 5 9-5" />
-                          </svg>
-                        )}
-                        {item.icon === 'TrendingUp' && (
-                          <svg className={`w-5 h-5 ${isActive ? 'text-white' : 'text-slate-400 group-hover:text-slate-300'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-                          </svg>
-                        )}
-                        {item.icon === 'BarChart3' && (
-                          <svg className={`w-5 h-5 ${isActive ? 'text-white' : 'text-slate-400 group-hover:text-slate-300'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                          </svg>
-                        )}
-                      </div>
-                      <span className={`font-medium transition-colors ${
-                        isActive ? 'text-emerald-300' : 'text-slate-400 group-hover:text-slate-200'
-                      }`}>
-                    {item.name}
-                      </span>
-                  </Link>
-                );
-              })}
-              </div>
-            </nav>
+      <aside
+        className={`fixed inset-y-0 left-0 z-50 w-[min(260px,85vw)] border-r border-[var(--admin-sidebar-border)] bg-[var(--admin-sidebar)] shadow-[8px_0_24px_rgba(0,0,0,0.35)] transition-transform lg:hidden ${
+          mobileOpen ? 'translate-x-0' : '-translate-x-full'
+        }`}
+      >
+        {sidebarInner('mobile')}
+      </aside>
 
-            {/* Logout */}
-            <div className="p-6">
+      <div className="flex min-h-screen">
+        <aside
+          className="relative sticky top-0 z-20 hidden h-screen shrink-0 border-r border-[var(--admin-sidebar-border)] bg-[var(--admin-sidebar)] shadow-[8px_0_28px_rgba(0,0,0,0.4)] transition-[width] duration-200 lg:flex lg:flex-col"
+          style={{
+            width: collapsed ? 'var(--admin-sidebar-collapsed)' : 'var(--admin-sidebar-expanded)',
+          }}
+        >
+          {sidebarInner('desktop')}
+
+          {/* Collapse control: centered on the sidebar's right border */}
+          <button
+            type="button"
+            onClick={toggleCollapsed}
+            title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            className="absolute top-1/2 right-0 z-30 flex h-8 w-8 -translate-y-1/2 translate-x-1/2 items-center justify-center rounded-full border-2 border-emerald-400/70 bg-slate-950 text-emerald-300 shadow-[0_0_0_4px_rgba(2,6,23,0.9),0_4px_14px_rgba(0,0,0,0.55)] transition-all hover:scale-105 hover:border-emerald-300 hover:bg-emerald-500 hover:text-slate-950"
+          >
+            {collapsed ? <ChevronRight className="h-4 w-4" strokeWidth={2.5} /> : <ChevronLeft className="h-4 w-4" strokeWidth={2.5} />}
+          </button>
+        </aside>
+
+        <div className="flex min-w-0 flex-1 flex-col">
+          <header className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-[var(--admin-border)] bg-[var(--admin-bg)]/90 px-4 backdrop-blur-md lg:px-6">
+            {/* Wrapper ensures lg:hidden isn't overridden by .admin-btn { display: inline-flex } */}
+            <div className="lg:hidden">
               <button
-              onClick={handleLogout}
-                className="group flex items-center w-full px-4 py-4 text-sm font-medium text-slate-400 hover:text-slate-200 rounded-2xl hover:bg-slate-700/30 transition-all duration-200 hover:shadow-md"
+                type="button"
+                className="admin-btn admin-btn-secondary !py-1.5"
+                onClick={() => setMobileOpen(true)}
               >
-                <div className="w-9 h-9 bg-slate-700/50 rounded-xl flex items-center justify-center mr-4 group-hover:bg-red-500/20 transition-colors">
-                  <svg className="w-5 h-5 text-slate-400 group-hover:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                  </svg>
-                </div>
-                <span>Sign Out</span>
+                <Menu className="h-4 w-4" />
+                Menu
               </button>
             </div>
-          </div>
-        </div>
-
-        {/* Mobile Header */}
-        <div className="sticky top-0 z-10 bg-gradient-to-r from-slate-800 to-slate-900 border-b border-slate-700/50 shadow-lg">
-          <div className="flex items-center justify-between h-16 px-4">
-            <button
-              onClick={() => setSidebarOpen(true)}
-              className="text-slate-400 hover:text-slate-200 p-2 rounded-lg hover:bg-slate-700/30 transition-colors"
-            >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-              </svg>
-            </button>
-            <div className="flex items-center">
-              <div className="w-8 h-8 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-lg flex items-center justify-center shadow-lg">
-                <span className="text-white font-bold text-sm">MS</span>
-              </div>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-semibold text-[var(--admin-text)]">{currentTitle}</p>
+              <p className="truncate text-[11px] text-[var(--admin-faint)]">
+                {adminRole === 'sub-admin' ? 'Sub-admin' : 'Main admin'}
+              </p>
             </div>
-          </div>
-        </div>
+          </header>
 
-        {/* Mobile Content */}
-        <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 min-h-screen">
-          {children}
+          <main className="min-w-0 flex-1 overflow-x-hidden px-4 py-6 lg:px-6 lg:py-8">
+            <div className="mx-auto w-full max-w-[1400px]">{children}</div>
+          </main>
         </div>
       </div>
     </div>
   );
 }
-

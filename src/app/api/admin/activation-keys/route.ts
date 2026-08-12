@@ -17,12 +17,22 @@ export async function GET(request: NextRequest) {
 
     await connectToDatabase();
 
-    const keys = await ActivationKey.find()
-      .populate('usedBy', 'name email')
-      .populate('soldBy', 'name email')
-      .populate('purchasedBy', 'name email')
-      .populate('createdBy', 'name email')
-      .sort({ createdAt: -1 });
+    const { searchParams } = new URL(request.url);
+    const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(searchParams.get('limit') || '25', 10) || 25));
+    const skip = (page - 1) * limit;
+
+    const [keys, total] = await Promise.all([
+      ActivationKey.find()
+        .populate('usedBy', 'name email')
+        .populate('soldBy', 'name email')
+        .populate('purchasedBy', 'name email')
+        .populate('createdBy', 'name email')
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit),
+      ActivationKey.countDocuments(),
+    ]);
 
     return NextResponse.json({
       success: true,
@@ -52,7 +62,14 @@ export async function GET(request: NextRequest) {
           email: key.createdBy.email
         } : null,
         createdAt: key.createdAt
-      }))
+      })),
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.max(1, Math.ceil(total / limit) || 1),
+        pages: Math.max(1, Math.ceil(total / limit) || 1),
+      }
     });
 
   } catch (error: any) {

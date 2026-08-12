@@ -51,6 +51,9 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url);
     const search = (searchParams.get('search') || '').trim();
+    const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(searchParams.get('limit') || '20', 10) || 20));
+    const skip = (page - 1) * limit;
 
     const searchQuery: any = {};
     if (search) {
@@ -61,9 +64,14 @@ export async function GET(request: NextRequest) {
       ];
     }
 
-    const leads = await PropertyLead.find(searchQuery)
-      .populate('property', 'title')
-      .sort({ createdAt: -1 });
+    const [leads, total] = await Promise.all([
+      PropertyLead.find(searchQuery)
+        .populate('property', 'title')
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit),
+      PropertyLead.countDocuments(searchQuery),
+    ]);
 
     const leadPairs = leads
       .map((lead: any) => ({
@@ -119,7 +127,14 @@ export async function GET(request: NextRequest) {
             reviewedAt: match.reviewedAt
           };
         })()
-      }))
+      })),
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.max(1, Math.ceil(total / limit) || 1),
+        pages: Math.max(1, Math.ceil(total / limit) || 1),
+      }
     });
   } catch (error: any) {
     console.error('Get property leads error:', error);

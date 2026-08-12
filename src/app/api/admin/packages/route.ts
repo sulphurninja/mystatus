@@ -15,11 +15,26 @@ export async function GET(request: NextRequest) {
 
     await connectToDatabase();
 
-    const packages = await Package.find().sort({ createdAt: -1 });
+    const { searchParams } = new URL(request.url);
+    const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(searchParams.get('limit') || '20', 10) || 20));
+    const skip = (page - 1) * limit;
+
+    const [packages, total] = await Promise.all([
+      Package.find().sort({ createdAt: -1 }).skip(skip).limit(limit),
+      Package.countDocuments(),
+    ]);
 
     return NextResponse.json({
       success: true,
-      packages
+      packages,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.max(1, Math.ceil(total / limit) || 1),
+        pages: Math.max(1, Math.ceil(total / limit) || 1),
+      }
     });
   } catch (error: any) {
     console.error('Get packages error:', error);

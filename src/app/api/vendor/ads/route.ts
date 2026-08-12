@@ -4,6 +4,7 @@ import Vendor from '@/models/Vendor';
 import Advertisement from '@/models/Advertisement';
 import VendorPackage from '@/models/VendorPackage';
 import { authenticateRequest } from '@/middleware/auth';
+import { detectAdMediaType } from '@/lib/adMedia';
 
 export async function GET(request: NextRequest) {
   try {
@@ -27,6 +28,7 @@ export async function GET(request: NextRequest) {
         title: ad.title,
         description: ad.description,
         image: ad.image,
+        mediaType: detectAdMediaType(ad.image, (ad as any).mediaType),
         rewardAmount: ad.rewardAmount,
         isActive: ad.isActive,
         totalShares: ad.totalShares,
@@ -79,11 +81,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { title, description, image, rewardAmount, verificationPeriodHours, commissionEnabled, commissionNote } = await request.json();
+    const { title, description, image, mediaType, rewardAmount, verificationPeriodHours, commissionEnabled, commissionNote } = await request.json();
 
     if (!title || !description || !image || rewardAmount === undefined) {
       return NextResponse.json(
-        { success: false, message: 'Title, description, image, and reward amount are required' },
+        { success: false, message: 'Title, description, media, and reward amount are required' },
         { status: 400 }
       );
     }
@@ -92,9 +94,12 @@ export async function POST(request: NextRequest) {
       title: title.trim(),
       description: description.trim(),
       image,
+      mediaType: detectAdMediaType(image, mediaType),
       rewardAmount,
       vendor: vendor._id,
-      verificationPeriodHours: verificationPeriodHours || 8,
+      verificationPeriodHours: verificationPeriodHours !== undefined && verificationPeriodHours !== null && verificationPeriodHours !== ''
+        ? Number(verificationPeriodHours)
+        : 8,
       activatedAt: new Date(),
       commissionEnabled: !!commissionEnabled,
       commissionNote: commissionNote ? String(commissionNote).trim().slice(0, 200) : ''

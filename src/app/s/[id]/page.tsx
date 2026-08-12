@@ -2,6 +2,7 @@ import { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import connectToDatabase from '@/lib/mongodb';
 import Advertisement from '@/models/Advertisement';
+import { isVideoMedia } from '@/lib/adMedia';
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -90,11 +91,21 @@ export default async function ShareableAdPage({ params }: Props) {
           <div className="glass-card rounded-2xl overflow-hidden">
             {advertisement.image && (
               <div className="w-full aspect-video bg-slate-950">
-                <img
-                  src={advertisement.image}
-                  alt={advertisement.title}
-                  className="w-full h-full object-cover"
-                />
+                {isVideoMedia(advertisement.image, (advertisement as any).mediaType) ? (
+                  <video
+                    src={advertisement.image}
+                    className="w-full h-full object-cover"
+                    controls
+                    playsInline
+                    preload="metadata"
+                  />
+                ) : (
+                  <img
+                    src={advertisement.image}
+                    alt={advertisement.title}
+                    className="w-full h-full object-cover"
+                  />
+                )}
               </div>
             )}
             <div className="p-6">

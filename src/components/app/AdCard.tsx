@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import CoinAmount from './CoinAmount';
+import AdMedia from './AdMedia';
 import { Clock, Share2, Zap, Percent } from 'lucide-react';
 
 interface Advertisement {
@@ -12,6 +13,7 @@ interface Advertisement {
     name: string;
   };
   imageUrl?: string;
+  mediaType?: 'image' | 'video';
   reward: number;
   verificationPeriod: 'instant' | 'hour1' | 'hour2' | 'hour3' | 'hour4' | 'hour5' | 'hour6' | 'hour12' | 'hour24';
   views?: number;
@@ -50,9 +52,11 @@ export default function AdCard({ ad, onClick }: AdCardProps) {
       {/* Image */}
       {ad.imageUrl && (
         <div className="relative h-44 bg-slate-900/50 overflow-hidden">
-          <img
+          <AdMedia
             src={ad.imageUrl}
             alt={ad.title}
+            mediaType={ad.mediaType}
+            controls={false}
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
           />
           {/* Gradient Overlay */}

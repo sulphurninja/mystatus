@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import connectToDatabase from '@/lib/mongodb';
 import Advertisement from '@/models/Advertisement';
+import { detectAdMediaType } from '@/lib/adMedia';
 
 export async function GET(request: NextRequest) {
   try {
@@ -18,6 +19,7 @@ export async function GET(request: NextRequest) {
         title: ad.title,
         description: ad.description,
         image: ad.image,
+        mediaType: detectAdMediaType(ad.image, (ad as any).mediaType),
         rewardAmount: ad.rewardAmount,
         vendor: {
           id: ad.vendor._id,
